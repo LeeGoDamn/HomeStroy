@@ -32,6 +32,11 @@ function writeJSON(filename, data) {
   fs.writeFileSync(filepath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+// 验证键名是否安全（防止原型污染）
+function isSafeKey(key) {
+  return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
 // API路由 - 家庭成员
 app.get('/api/members', (req, res) => {
   const members = readJSON('members.json') || [];
@@ -101,11 +106,19 @@ app.get('/api/member-attributes', (req, res) => {
 });
 
 app.put('/api/member-attributes/:memberId/:attrId', (req, res) => {
-  const attributes = readJSON('member-attributes.json') || {};
-  if (!attributes[req.params.memberId]) {
-    attributes[req.params.memberId] = {};
+  const memberId = req.params.memberId;
+  const attrId = req.params.attrId;
+  
+  // 验证键名安全性
+  if (!isSafeKey(memberId) || !isSafeKey(attrId)) {
+    return res.status(400).json({ error: '无效的参数' });
   }
-  attributes[req.params.memberId][req.params.attrId] = req.body.value;
+  
+  const attributes = readJSON('member-attributes.json') || {};
+  if (!attributes[memberId]) {
+    attributes[memberId] = {};
+  }
+  attributes[memberId][attrId] = req.body.value;
   writeJSON('member-attributes.json', attributes);
   res.json({ success: true });
 });
