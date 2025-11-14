@@ -517,3 +517,130 @@ tr:hover {
     font-size: 20px;
   }
 }
+
+/* 知识库样式 */
+.knowledge-categories {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  padding: 30px;
+}
+
+.knowledge-category-card {
+  background: white;
+  border-radius: 12px;
+  padding: 30px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  position: relative;
+}
+
+.knowledge-category-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.knowledge-category-card.add-category {
+  border: 2px dashed #ddd;
+  background: #f9fafb;
+}
+
+.knowledge-category-card.add-category:hover {
+  border-color: #667eea;
+  background: #f0f4ff;
+}
+
+.category-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.category-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.category-delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: #ef4444;
+  color: white;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.knowledge-category-card:hover .category-delete-btn {
+  opacity: 1;
+}
+
+.category-delete-btn:hover {
+  background: #dc2626;
+}
+
+.knowledge-tree {
+  padding: 20px;
+}
+
+.knowledge-tree-item {
+  margin-bottom: 10px;
+}
+
+.tree-item-header {
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  background: #f9fafb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.tree-item-header:hover {
+  background: #f0f4ff;
+  transform: translateX(4px);
+}
+
+.tree-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.tree-name {
+  font-size: 18px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.tree-count {
+  color: #888;
+  font-size: 16px;
+}
+
+.knowledge-item-card {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 15px;
+  border-left: 4px solid #667eea;
+}
+
+.breadcrumb-item {
+  color: #667eea;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.breadcrumb-item:hover {
+  color: #764ba2;
+}
