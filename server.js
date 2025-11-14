@@ -7,10 +7,22 @@ const PORT = process.env.PORT || 3000;
 
 // 数据目录
 const DATA_DIR = path.join(__dirname, 'data');
+const KNOWLEDGE_DIR = path.join(DATA_DIR, 'knowledge');
+const KNOWLEDGE_IMAGES_DIR = path.join(KNOWLEDGE_DIR, 'images');
 
 // 确保数据目录存在
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR);
+}
+
+// 确保知识库目录存在
+if (!fs.existsSync(KNOWLEDGE_DIR)) {
+  fs.mkdirSync(KNOWLEDGE_DIR);
+}
+
+// 确保知识库图片目录存在
+if (!fs.existsSync(KNOWLEDGE_IMAGES_DIR)) {
+  fs.mkdirSync(KNOWLEDGE_IMAGES_DIR);
 }
 
 // 中间件
@@ -131,9 +143,14 @@ app.get('/api/todos', (req, res) => {
 
 app.post('/api/todos', (req, res) => {
   const todos = readJSON('todos.json') || [];
+  const deadlineDays = req.body.deadlineDays || 1;
+  const deadline = new Date();
+  deadline.setDate(deadline.getDate() + deadlineDays);
+  
   const newTodo = {
     id: Date.now().toString(),
     ...req.body,
+    deadline: deadline.toISOString(),
     addedAt: new Date().toISOString()
   };
   todos.push(newTodo);
@@ -171,6 +188,7 @@ app.post('/api/periodic-tasks', (req, res) => {
   const newTask = {
     id: Date.now().toString(),
     ...req.body,
+    deadlineDays: req.body.deadlineDays || 1,
     createdAt: new Date().toISOString(),
     generatedCount: 0
   };
@@ -212,6 +230,10 @@ app.post('/api/periodic-tasks/:id/generate', (req, res) => {
     return res.status(400).json({ error: '已达到最大生成次数' });
   }
   
+  const deadlineDays = task.deadlineDays || 1;
+  const deadline = new Date();
+  deadline.setDate(deadline.getDate() + deadlineDays);
+  
   const newTodo = {
     id: Date.now().toString(),
     content: task.content,
@@ -219,6 +241,7 @@ app.post('/api/periodic-tasks/:id/generate', (req, res) => {
     executor: task.executor || '',
     status: '待处理',
     addedAt: new Date().toISOString(),
+    deadline: deadline.toISOString(),
     fromPeriodicTask: task.id
   };
   
@@ -229,6 +252,359 @@ app.post('/api/periodic-tasks/:id/generate', (req, res) => {
   writeJSON('periodic-tasks.json', tasks);
   
   res.json({ todo: newTodo, task });
+});
+
+// ========== 知识库 API ==========
+
+// 扫描知识库目录结构
+function scanKnowledgeBase() {
+  const categories = [];
+  
+  if (!fs.existsSync(KNOWLEDGE_DIR)) {
+    return categories;
+  }
+  
+  const rootItems = fs.readdirSync(KNOWLEDGE_DIR, { withFileTypes: true });
+  
+  for (const item of rootItems) {
+    if (item.isDirectory() && item.name !== 'images') {
+      const categoryPath = path.join(KNOWLEDGE_DIR, item.name);
+      const category = {
+        name: item.name,
+        path: item.name,
+        children: scanCategory(categoryPath, item.name)
+      };
+      categories.push(category);
+    }
+  }
+  
+  return categories;
+}
+
+// 递归扫描分类目录
+function scanCategory(dirPath, relativePath) {
+  const items = [];
+  
+  if (!fs.existsSync(dirPath)) {
+    return items;
+  }
+  
+  const dirItems = fs.readdirSync(dirPath, { withFileTypes: true });
+  
+  for (const item of dirItems) {
+    if (item.isDirectory()) {
+      // 子目录
+      const itemPath = path.join(dirPath, item.name);
+      const itemRelativePath = `${relativePath}/${item.name}`;
+      items.push({
+        type: 'category',
+        name: item.name,
+        path: itemRelativePath,
+        children: scanCategory(itemPath, itemRelativePath)
+      });
+    } else if (item.isFile() && item.name.endsWith('.json')) {
+      // JSON文件作为二级分类
+      const itemPath = path.join(dirPath, item.name);
+      const itemRelativePath = `${relativePath}/${item.name}`;
+      const categoryName = item.name.replace('.json', '');
+      
+      try {
+        const data = JSON.parse(fs.readFileSync(itemPath, 'utf-8'));
+        items.push({
+          type: 'file',
+          name: categoryName,
+          path: itemRelativePath,
+          knowledgeItems: data.items || []
+        });
+      } catch (error) {
+        console.error(`读取知识库文件失败: ${itemPath}`, error);
+      }
+    }
+  }
+  
+  return items;
+}
+
+// 获取知识库结构
+app.get('/api/knowledge/structure', (req, res) => {
+  try {
+    const structure = scanKnowledgeBase();
+    res.json(structure);
+  } catch (error) {
+    console.error('获取知识库结构失败:', error);
+    res.status(500).json({ error: '获取知识库结构失败' });
+  }
+});
+
+// 获取知识库配置（当前学习人、目标属性）
+app.get('/api/knowledge/config', (req, res) => {
+  const config = readJSON('knowledge-config.json') || {
+    currentLearners: [],
+    targetAttributes: {}
+  };
+  res.json(config);
+});
+
+// 保存知识库配置
+app.put('/api/knowledge/config', (req, res) => {
+  writeJSON('knowledge-config.json', req.body);
+  res.json({ success: true });
+});
+
+// 创建根分类（大分类）
+app.post('/api/knowledge/category', (req, res) => {
+  const { name } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: '分类名称不能为空' });
+  }
+  
+  const categoryPath = path.join(KNOWLEDGE_DIR, name);
+  
+  if (fs.existsSync(categoryPath)) {
+    return res.status(400).json({ error: '分类已存在' });
+  }
+  
+  fs.mkdirSync(categoryPath, { recursive: true });
+  res.json({ success: true });
+});
+
+// 删除分类
+app.delete('/api/knowledge/category', (req, res) => {
+  const { categoryPath } = req.body;
+  
+  if (!categoryPath) {
+    return res.status(400).json({ error: '分类路径不能为空' });
+  }
+  
+  const fullPath = path.join(KNOWLEDGE_DIR, categoryPath);
+  
+  if (!fs.existsSync(fullPath)) {
+    return res.status(404).json({ error: '分类不存在' });
+  }
+  
+  // 递归删除目录
+  fs.rmSync(fullPath, { recursive: true, force: true });
+  res.json({ success: true });
+});
+
+// 创建子分类或知识项文件
+app.post('/api/knowledge/subcategory', (req, res) => {
+  const { parentPath, name, isFile } = req.body;
+  
+  if (!parentPath || !name) {
+    return res.status(400).json({ error: '参数不完整' });
+  }
+  
+  const parentFullPath = path.join(KNOWLEDGE_DIR, parentPath);
+  
+  if (!fs.existsSync(parentFullPath)) {
+    return res.status(404).json({ error: '父分类不存在' });
+  }
+  
+  if (isFile) {
+    // 创建知识项JSON文件
+    const filePath = path.join(parentFullPath, `${name}.json`);
+    if (fs.existsSync(filePath)) {
+      return res.status(400).json({ error: '文件已存在' });
+    }
+    writeJSON(`knowledge/${parentPath}/${name}.json`, { items: [] });
+  } else {
+    // 创建子目录
+    const dirPath = path.join(parentFullPath, name);
+    if (fs.existsSync(dirPath)) {
+      return res.status(400).json({ error: '目录已存在' });
+    }
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+  
+  res.json({ success: true });
+});
+
+// 获取知识项列表
+app.get('/api/knowledge/items', (req, res) => {
+  const { filePath } = req.query;
+  
+  if (!filePath) {
+    return res.status(400).json({ error: '文件路径不能为空' });
+  }
+  
+  const data = readJSON(`knowledge/${filePath}`) || { items: [] };
+  res.json(data.items || []);
+});
+
+// 添加或更新知识项
+app.post('/api/knowledge/item', (req, res) => {
+  const { filePath, item } = req.body;
+  
+  if (!filePath || !item) {
+    return res.status(400).json({ error: '参数不完整' });
+  }
+  
+  const data = readJSON(`knowledge/${filePath}`) || { items: [] };
+  
+  if (item.id) {
+    // 更新现有项
+    const index = data.items.findIndex(i => i.id === item.id);
+    if (index !== -1) {
+      data.items[index] = item;
+    }
+  } else {
+    // 添加新项
+    item.id = Date.now().toString();
+    item.createdAt = new Date().toISOString();
+    data.items.push(item);
+  }
+  
+  writeJSON(`knowledge/${filePath}`, data);
+  res.json(item);
+});
+
+// 删除知识项
+app.delete('/api/knowledge/item', (req, res) => {
+  const { filePath, itemId } = req.body;
+  
+  if (!filePath || !itemId) {
+    return res.status(400).json({ error: '参数不完整' });
+  }
+  
+  const data = readJSON(`knowledge/${filePath}`) || { items: [] };
+  data.items = data.items.filter(i => i.id !== itemId);
+  
+  writeJSON(`knowledge/${filePath}`, data);
+  res.json({ success: true });
+});
+
+// 增加学习次数
+app.post('/api/knowledge/item/learn', (req, res) => {
+  const { filePath, itemId, learners, targetAttributes } = req.body;
+  
+  if (!filePath || !itemId) {
+    return res.status(400).json({ error: '参数不完整' });
+  }
+  
+  const data = readJSON(`knowledge/${filePath}`) || { items: [] };
+  const item = data.items.find(i => i.id === itemId);
+  
+  if (!item) {
+    return res.status(404).json({ error: '知识项不存在' });
+  }
+  
+  // 更新知识项
+  item.learnCount = (item.learnCount || 0) + 1;
+  item.lastLearnTime = new Date().toISOString();
+  
+  writeJSON(`knowledge/${filePath}`, data);
+  
+  // 更新学习人属性
+  if (learners && learners.length > 0 && targetAttributes) {
+    const memberAttributes = readJSON('member-attributes.json') || {};
+    
+    for (const learnerId of learners) {
+      if (!memberAttributes[learnerId]) {
+        memberAttributes[learnerId] = {};
+      }
+      
+      for (const attrId of Object.keys(targetAttributes)) {
+        const currentValue = memberAttributes[learnerId][attrId] || 0;
+        memberAttributes[learnerId][attrId] = parseInt(currentValue) + 1;
+      }
+    }
+    
+    writeJSON('member-attributes.json', memberAttributes);
+  }
+  
+  res.json(item);
+});
+
+// 增加忘记次数
+app.post('/api/knowledge/item/forget', (req, res) => {
+  const { filePath, itemId } = req.body;
+  
+  if (!filePath || !itemId) {
+    return res.status(400).json({ error: '参数不完整' });
+  }
+  
+  const data = readJSON(`knowledge/${filePath}`) || { items: [] };
+  const item = data.items.find(i => i.id === itemId);
+  
+  if (!item) {
+    return res.status(404).json({ error: '知识项不存在' });
+  }
+  
+  item.forgetCount = (item.forgetCount || 0) + 1;
+  
+  writeJSON(`knowledge/${filePath}`, data);
+  res.json(item);
+});
+
+// 导入知识数据
+app.post('/api/knowledge/import', (req, res) => {
+  const { data } = req.body;
+  
+  if (!Array.isArray(data)) {
+    return res.status(400).json({ error: '数据格式错误' });
+  }
+  
+  let imported = 0;
+  
+  for (const item of data) {
+    const { levelRootName, level1Name, level2Name, level3Name, ...knowledgeItem } = item;
+    
+    if (!levelRootName || !level1Name) {
+      continue;
+    }
+    
+    // 构建路径
+    let filePath = `${levelRootName}/${level1Name}`;
+    
+    // 确保目录存在
+    const rootPath = path.join(KNOWLEDGE_DIR, levelRootName);
+    if (!fs.existsSync(rootPath)) {
+      fs.mkdirSync(rootPath, { recursive: true });
+    }
+    
+    const level1Path = path.join(rootPath, level1Name);
+    if (!fs.existsSync(level1Path)) {
+      fs.mkdirSync(level1Path, { recursive: true });
+    }
+    
+    // 如果有level2Name，添加到路径
+    if (level2Name) {
+      const level2Path = path.join(level1Path, level2Name);
+      if (!fs.existsSync(level2Path)) {
+        fs.mkdirSync(level2Path, { recursive: true });
+      }
+      filePath = `${levelRootName}/${level1Name}/${level2Name}`;
+      
+      // 如果有level3Name，这是文件名
+      if (level3Name) {
+        filePath = `${filePath}/${level3Name}.json`;
+      } else {
+        // level2Name是文件名
+        filePath = `${levelRootName}/${level1Name}/${level2Name}.json`;
+      }
+    } else {
+      // level1Name是文件名
+      filePath = `${levelRootName}/${level1Name}.json`;
+    }
+    
+    // 读取现有数据
+    const fileData = readJSON(`knowledge/${filePath}`) || { items: [] };
+    
+    // 添加知识项
+    knowledgeItem.id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    knowledgeItem.createdAt = new Date().toISOString();
+    knowledgeItem.learnCount = knowledgeItem.learnCount || 0;
+    knowledgeItem.forgetCount = knowledgeItem.forgetCount || 0;
+    
+    fileData.items.push(knowledgeItem);
+    
+    writeJSON(`knowledge/${filePath}`, fileData);
+    imported++;
+  }
+  
+  res.json({ success: true, imported });
 });
 
 app.listen(PORT, () => {

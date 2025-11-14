@@ -5,7 +5,14 @@ const AppState = {
   attributeDefinitions: [],
   memberAttributes: {},
   todos: [],
-  periodicTasks: []
+  periodicTasks: [],
+  knowledgeStructure: [],
+  knowledgeConfig: { currentLearners: [], targetAttributes: {} },
+  knowledgeSubPage: 'categories', // categories, free-learn, import
+  currentKnowledgePath: null,
+  freeLearnItems: [],
+  freeLearnIndex: 0,
+  freeLearnShowDetail: false
 };
 
 // API 辅助函数
@@ -98,9 +105,6 @@ function renderPage(page) {
     case 'members':
       renderMembersPage();
       break;
-    case 'attributes':
-      renderAttributesPage();
-      break;
     case 'todos':
       renderTodosPage();
       break;
@@ -119,10 +123,13 @@ async function renderMembersPage() {
   const contentArea = document.getElementById('contentArea');
   
   subNav.innerHTML = `
-    <button class="sub-nav-btn primary" onclick="addMember()">➕ 添加成员</button>
+    <button class="sub-nav-btn primary" onclick="addMember()">➕ 添加家庭成员</button>
+    <button class="sub-nav-btn primary" onclick="addAttributeDefinition()">➕ 添加属性类型</button>
   `;
   
   AppState.members = await apiCall('/api/members');
+  AppState.attributeDefinitions = await apiCall('/api/attribute-definitions');
+  AppState.memberAttributes = await apiCall('/api/member-attributes');
   
   if (AppState.members.length === 0) {
     contentArea.innerHTML = `
@@ -134,24 +141,89 @@ async function renderMembersPage() {
     return;
   }
   
+  if (AppState.attributeDefinitions.length === 0) {
+    contentArea.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">家庭成员列表</h2>
+        </div>
+        <div>
+          ${AppState.members.map(member => `
+            <div class="list-item">
+              <div class="item-info">
+                <span class="item-label">${member.name}</span>
+                <span class="item-value">${member.relationship || ''}</span>
+              </div>
+              <div class="item-actions">
+                <button class="btn btn-sm btn-info" onclick="editMember('${member.id}')">编辑</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteMember('${member.id}')">删除</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="empty-state" style="margin-top: 20px;">
+        <div class="empty-state-icon">📊</div>
+        <div class="empty-state-text">还没有属性类型，点击上方按钮添加吧</div>
+      </div>
+    `;
+    return;
+  }
+  
+  // 显示成员属性表格（横轴是家庭成员，纵轴是属性）
   contentArea.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">家庭成员列表</h2>
+        <h2 class="card-title">家庭成员属性管理</h2>
       </div>
-      <div>
-        ${AppState.members.map(member => `
-          <div class="list-item">
-            <div class="item-info">
-              <span class="item-label">${member.name}</span>
-              <span class="item-value">${member.relationship || ''}</span>
-            </div>
-            <div class="item-actions">
-              <button class="btn btn-sm btn-info" onclick="editMember('${member.id}')">编辑</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteMember('${member.id}')">删除</button>
-            </div>
-          </div>
-        `).join('')}
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>属性 / 成员</th>
+              ${AppState.members.map(member => `
+                <th>
+                  ${member.name}
+                  <button class="btn btn-sm btn-info" onclick="editMember('${member.id}')" style="margin-left: 8px;">编辑</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteMember('${member.id}')" style="margin-left: 4px;">删除</button>
+                </th>
+              `).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${AppState.attributeDefinitions.map(def => `
+              <tr>
+                <td>
+                  <strong>${def.name} (${def.type === 'integer' ? '整数' : '字符串'})</strong>
+                  <button class="btn btn-sm btn-danger" onclick="deleteAttributeDefinition('${def.id}')" style="margin-left: 8px;">删除</button>
+                </td>
+                ${AppState.members.map(member => {
+                  const value = AppState.memberAttributes[member.id]?.[def.id] || (def.type === 'integer' ? 0 : '');
+                  return `
+                    <td>
+                      ${def.type === 'integer' 
+                        ? `
+                          <div class="attr-value-control">
+                            <button class="attr-btn minus" onclick="adjustAttribute('${member.id}', '${def.id}', -1)">−</button>
+                            <span class="attr-value">${value}</span>
+                            <button class="attr-btn plus" onclick="adjustAttribute('${member.id}', '${def.id}', 1)">+</button>
+                          </div>
+                        `
+                        : `
+                          <input type="text" 
+                            class="form-input" 
+                            value="${value}" 
+                            onchange="updateAttribute('${member.id}', '${def.id}', this.value)"
+                            style="font-size: 16px;">
+                        `
+                      }
+                    </td>
+                  `;
+                }).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     </div>
   `;
@@ -248,93 +320,7 @@ async function deleteMember(id) {
   renderMembersPage();
 }
 
-// ========== 家庭成员属性页面 ==========
-async function renderAttributesPage() {
-  const subNav = document.getElementById('subNav');
-  const contentArea = document.getElementById('contentArea');
-  
-  subNav.innerHTML = `
-    <button class="sub-nav-btn primary" onclick="addAttributeDefinition()">➕ 添加属性类型</button>
-  `;
-  
-  AppState.members = await apiCall('/api/members');
-  AppState.attributeDefinitions = await apiCall('/api/attribute-definitions');
-  AppState.memberAttributes = await apiCall('/api/member-attributes');
-  
-  if (AppState.members.length === 0) {
-    contentArea.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">⚠️</div>
-        <div class="empty-state-text">请先添加家庭成员</div>
-      </div>
-    `;
-    return;
-  }
-  
-  if (AppState.attributeDefinitions.length === 0) {
-    contentArea.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">📊</div>
-        <div class="empty-state-text">还没有属性类型，点击上方按钮添加吧</div>
-      </div>
-    `;
-    return;
-  }
-  
-  contentArea.innerHTML = `
-    <div class="card">
-      <div class="card-header">
-        <h2 class="card-title">成员属性管理</h2>
-      </div>
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>成员</th>
-              ${AppState.attributeDefinitions.map(def => `
-                <th>
-                  ${def.name} (${def.type === 'integer' ? '整数' : '字符串'})
-                  <button class="btn btn-sm btn-danger" onclick="deleteAttributeDefinition('${def.id}')" style="margin-left: 8px;">删除</button>
-                </th>
-              `).join('')}
-            </tr>
-          </thead>
-          <tbody>
-            ${AppState.members.map(member => `
-              <tr>
-                <td><strong>${member.name}</strong></td>
-                ${AppState.attributeDefinitions.map(def => {
-                  const value = AppState.memberAttributes[member.id]?.[def.id] || (def.type === 'integer' ? 0 : '');
-                  return `
-                    <td>
-                      ${def.type === 'integer' 
-                        ? `
-                          <div class="attr-value-control">
-                            <button class="attr-btn minus" onclick="adjustAttribute('${member.id}', '${def.id}', -1)">−</button>
-                            <span class="attr-value">${value}</span>
-                            <button class="attr-btn plus" onclick="adjustAttribute('${member.id}', '${def.id}', 1)">+</button>
-                          </div>
-                        `
-                        : `
-                          <input type="text" 
-                            class="form-input" 
-                            value="${value}" 
-                            onchange="updateAttribute('${member.id}', '${def.id}', this.value)"
-                            style="font-size: 16px;">
-                        `
-                      }
-                    </td>
-                  `;
-                }).join('')}
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
+// ========== 家庭成员属性相关函数 ==========
 function addAttributeDefinition() {
   showModal(`
     <h2 style="margin-bottom: 20px; font-size: 24px;">添加属性类型</h2>
@@ -369,7 +355,7 @@ async function submitAttributeDefinition(e) {
   });
   
   hideModal();
-  renderAttributesPage();
+  renderMembersPage();
 }
 
 async function deleteAttributeDefinition(id) {
@@ -379,7 +365,7 @@ async function deleteAttributeDefinition(id) {
     method: 'DELETE'
   });
   
-  renderAttributesPage();
+  renderMembersPage();
 }
 
 async function adjustAttribute(memberId, attrId, delta) {
@@ -391,7 +377,7 @@ async function adjustAttribute(memberId, attrId, delta) {
     body: JSON.stringify({ value: newValue })
   });
   
-  renderAttributesPage();
+  renderMembersPage();
 }
 
 async function updateAttribute(memberId, attrId, value) {
@@ -505,6 +491,10 @@ function addTodo() {
           <option value="已完成">已完成</option>
         </select>
       </div>
+      <div class="form-group">
+        <label class="form-label">截止时间（天数）</label>
+        <input type="number" name="deadlineDays" class="form-input" value="1" min="1" placeholder="相对当前时间的天数">
+      </div>
       <button type="submit" class="btn btn-primary" style="width: 100%;">确定添加</button>
     </form>
   `);
@@ -547,6 +537,10 @@ function editTodo(id) {
           <option value="已完成" ${todo.status === '已完成' ? 'selected' : ''}>已完成</option>
         </select>
       </div>
+      <div class="form-group">
+        <label class="form-label">截止时间（天数）</label>
+        <input type="number" name="deadlineDays" class="form-input" value="1" min="1" placeholder="相对当前时间的天数">
+      </div>
       <button type="submit" class="btn btn-primary" style="width: 100%;">保存修改</button>
     </form>
   `);
@@ -559,7 +553,8 @@ async function submitTodo(e) {
     content: formData.get('content'),
     addedBy: formData.get('addedBy'),
     executor: formData.get('executor'),
-    status: formData.get('status')
+    status: formData.get('status'),
+    deadlineDays: parseInt(formData.get('deadlineDays')) || 1
   };
   
   await apiCall('/api/todos', {
@@ -578,7 +573,8 @@ async function submitEditTodo(e, id) {
     content: formData.get('content'),
     addedBy: formData.get('addedBy'),
     executor: formData.get('executor'),
-    status: formData.get('status')
+    status: formData.get('status'),
+    deadlineDays: parseInt(formData.get('deadlineDays')) || 1
   };
   
   await apiCall(`/api/todos/${id}`, {
@@ -692,6 +688,10 @@ function addPeriodicTask() {
         <label class="form-label">总派生次数</label>
         <input type="number" name="maxGenerations" class="form-input" placeholder="留空表示无限次">
       </div>
+      <div class="form-group">
+        <label class="form-label">任务截止时间（天数）</label>
+        <input type="number" name="deadlineDays" class="form-input" value="1" min="1" placeholder="生成任务的截止天数">
+      </div>
       <button type="submit" class="btn btn-primary" style="width: 100%;">确定添加</button>
     </form>
   `);
@@ -740,6 +740,10 @@ function editPeriodicTask(id) {
         <label class="form-label">总派生次数</label>
         <input type="number" name="maxGenerations" class="form-input" value="${task.maxGenerations || ''}" placeholder="留空表示无限次">
       </div>
+      <div class="form-group">
+        <label class="form-label">任务截止时间（天数）</label>
+        <input type="number" name="deadlineDays" class="form-input" value="${task.deadlineDays || 1}" min="1" placeholder="生成任务的截止天数">
+      </div>
       <button type="submit" class="btn btn-primary" style="width: 100%;">保存修改</button>
     </form>
   `);
@@ -753,7 +757,8 @@ async function submitPeriodicTask(e) {
     addedBy: formData.get('addedBy'),
     executor: formData.get('executor'),
     period: formData.get('period'),
-    maxGenerations: formData.get('maxGenerations') ? parseInt(formData.get('maxGenerations')) : null
+    maxGenerations: formData.get('maxGenerations') ? parseInt(formData.get('maxGenerations')) : null,
+    deadlineDays: parseInt(formData.get('deadlineDays')) || 1
   };
   
   await apiCall('/api/periodic-tasks', {
@@ -773,7 +778,8 @@ async function submitEditPeriodicTask(e, id) {
     addedBy: formData.get('addedBy'),
     executor: formData.get('executor'),
     period: formData.get('period'),
-    maxGenerations: formData.get('maxGenerations') ? parseInt(formData.get('maxGenerations')) : null
+    maxGenerations: formData.get('maxGenerations') ? parseInt(formData.get('maxGenerations')) : null,
+    deadlineDays: parseInt(formData.get('deadlineDays')) || 1
   };
   
   await apiCall(`/api/periodic-tasks/${id}`, {
@@ -808,16 +814,741 @@ async function generateTodoFromPeriodic(id) {
 }
 
 // ========== 知识库页面 ==========
-function renderKnowledgePage() {
+async function renderKnowledgePage() {
+  // 加载知识库数据
+  await loadKnowledgeData();
+  
+  // 根据子页面渲染
+  switch (AppState.knowledgeSubPage) {
+    case 'categories':
+      renderKnowledgeCategories();
+      break;
+    case 'free-learn':
+      renderFreeLearning();
+      break;
+    case 'import':
+      renderKnowledgeImport();
+      break;
+  }
+}
+
+async function loadKnowledgeData() {
+  try {
+    AppState.knowledgeStructure = await apiCall('/api/knowledge/structure');
+    AppState.knowledgeConfig = await apiCall('/api/knowledge/config');
+    AppState.members = await apiCall('/api/members');
+    AppState.attributeDefinitions = await apiCall('/api/attribute-definitions');
+  } catch (error) {
+    console.error('加载知识库数据失败:', error);
+  }
+}
+
+function renderKnowledgeCategories() {
   const subNav = document.getElementById('subNav');
   const contentArea = document.getElementById('contentArea');
   
-  subNav.innerHTML = '';
-  
-  contentArea.innerHTML = `
-    <div class="empty-state">
-      <div class="empty-state-icon">📚</div>
-      <div class="empty-state-text">知识库功能开发中，敬请期待...</div>
+  // 二级导航栏
+  subNav.innerHTML = `
+    <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; width: 100%;">
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <label style="font-size: 16px; font-weight: 500;">当前学习人:</label>
+        <select id="currentLearnersSelect" multiple class="form-select" style="min-width: 150px; height: 40px;" onchange="updateKnowledgeConfig()">
+          ${AppState.members.map(m => `
+            <option value="${m.id}" ${AppState.knowledgeConfig.currentLearners.includes(m.id) ? 'selected' : ''}>
+              ${m.name}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <label style="font-size: 16px; font-weight: 500;">目标属性:</label>
+        <select id="targetAttributesSelect" multiple class="form-select" style="min-width: 150px; height: 40px;" onchange="updateKnowledgeConfig()">
+          ${AppState.attributeDefinitions.map(attr => `
+            <option value="${attr.id}" ${AppState.knowledgeConfig.targetAttributes[attr.id] ? 'selected' : ''}>
+              ${attr.name}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+      <div style="flex: 1;"></div>
+      <button class="sub-nav-btn" onclick="showKnowledgeSubPage('free-learn')" style="background: #10b981; color: white;">🎯 自由学习</button>
+      <button class="sub-nav-btn" onclick="showKnowledgeSubPage('import')" style="background: #3b82f6; color: white;">📥 知识录入</button>
     </div>
   `;
+  
+  if (AppState.currentKnowledgePath) {
+    // 显示知识点列表
+    renderKnowledgeItems();
+  } else {
+    // 显示知识分类
+    renderKnowledgeStructure();
+  }
+}
+
+function renderKnowledgeStructure() {
+  const contentArea = document.getElementById('contentArea');
+  
+  if (AppState.knowledgeStructure.length === 0) {
+    contentArea.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📚</div>
+        <div class="empty-state-text">还没有知识库分类，点击下方按钮添加</div>
+      </div>
+      <div style="text-align: center; margin-top: 20px;">
+        <button class="btn btn-primary" onclick="addRootCategory()">➕ 添加知识大分类</button>
+      </div>
+    `;
+    return;
+  }
+  
+  contentArea.innerHTML = `
+    <div class="knowledge-categories">
+      ${AppState.knowledgeStructure.map(cat => `
+        <div class="knowledge-category-card" onclick="enterCategory('${cat.name}', ${JSON.stringify(cat).replace(/"/g, '&quot;')})">
+          <div class="category-icon">📚</div>
+          <div class="category-name">${cat.name}</div>
+          <button class="category-delete-btn" onclick="event.stopPropagation(); deleteRootCategory('${cat.name}')">×</button>
+        </div>
+      `).join('')}
+      <div class="knowledge-category-card add-category" onclick="addRootCategory()">
+        <div class="category-icon">➕</div>
+        <div class="category-name">添加分类</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderKnowledgeItems() {
+  const contentArea = document.getElementById('contentArea');
+  const pathParts = AppState.currentKnowledgePath.split('/');
+  
+  // 找到当前节点
+  let currentNode = null;
+  let currentData = AppState.knowledgeStructure;
+  
+  for (let i = 0; i < pathParts.length; i++) {
+    const part = pathParts[i];
+    currentNode = currentData.find(item => item.name === part || item.path === pathParts.slice(0, i + 1).join('/'));
+    if (currentNode) {
+      currentData = currentNode.children || [];
+    }
+  }
+  
+  const breadcrumb = pathParts.map((part, index) => {
+    const partPath = pathParts.slice(0, index + 1).join('/');
+    return `<span class="breadcrumb-item" onclick="navigateToPath('${index === 0 ? '' : partPath}')">${part}</span>`;
+  }).join(' / ');
+  
+  contentArea.innerHTML = `
+    <div class="card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <button class="btn btn-sm" onclick="navigateToPath('')" style="margin-right: 10px;">← 返回</button>
+          <span style="font-size: 18px;">${breadcrumb}</span>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-primary" onclick="addSubCategory()">➕ 添加子分类</button>
+        </div>
+      </div>
+      <div class="knowledge-tree">
+        ${currentData && currentData.length > 0 ? renderKnowledgeTree(currentData) : '<div style="padding: 20px; text-align: center; color: #888;">暂无内容</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderKnowledgeTree(items) {
+  return items.map(item => {
+    if (item.type === 'category') {
+      return `
+        <div class="knowledge-tree-item">
+          <div class="tree-item-header" onclick="navigateToPath('${item.path}')">
+            <span class="tree-icon">📁</span>
+            <span class="tree-name">${item.name}</span>
+          </div>
+        </div>
+      `;
+    } else if (item.type === 'file') {
+      return `
+        <div class="knowledge-tree-item">
+          <div class="tree-item-header" onclick="viewKnowledgeFile('${item.path}', '${item.name}')">
+            <span class="tree-icon">📄</span>
+            <span class="tree-name">${item.name}</span>
+            <span class="tree-count">(${item.knowledgeItems.length})</span>
+          </div>
+        </div>
+      `;
+    }
+  }).join('');
+}
+
+async function viewKnowledgeFile(filePath, categoryName) {
+  try {
+    const items = await apiCall(`/api/knowledge/items?filePath=${encodeURIComponent(filePath)}`);
+    showKnowledgeItemsList(filePath, categoryName, items);
+  } catch (error) {
+    console.error('加载知识项失败:', error);
+  }
+}
+
+function showKnowledgeItemsList(filePath, categoryName, items) {
+  showModal(`
+    <div style="max-width: 900px;">
+      <h2 style="margin-bottom: 20px; font-size: 24px;">${categoryName} - 知识点列表</h2>
+      <button class="btn btn-sm btn-primary" onclick="addKnowledgeItem('${filePath}')" style="margin-bottom: 15px;">➕ 添加知识点</button>
+      ${items.length === 0 ? '<p style="color: #888; text-align: center; padding: 20px;">暂无知识点</p>' : `
+        <div style="max-height: 500px; overflow-y: auto;">
+          ${items.map(item => `
+            <div class="knowledge-item-card">
+              <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                  <h3 style="font-size: 20px; margin-bottom: 10px;">${item.name}</h3>
+                  ${item.brief ? `<p style="color: #666; margin-bottom: 8px;"><strong>概括:</strong> ${item.brief}</p>` : ''}
+                  ${item.detail ? `<p style="color: #666; margin-bottom: 8px;"><strong>详情:</strong> ${item.detail}</p>` : ''}
+                  ${item.url ? `<p style="color: #666; margin-bottom: 8px;"><strong>链接:</strong> <a href="${item.url}" target="_blank">${item.url}</a></p>` : ''}
+                  <div style="margin-top: 10px; color: #888; font-size: 14px;">
+                    学会: ${item.learnCount || 0}次 | 忘记: ${item.forgetCount || 0}次
+                    ${item.lastLearnTime ? ` | 最后学习: ${new Date(item.lastLearnTime).toLocaleString('zh-CN')}` : ''}
+                  </div>
+                </div>
+                <div style="display: flex; gap: 5px; margin-left: 15px;">
+                  <button class="btn btn-sm btn-success" onclick="markAsLearned('${filePath}', '${item.id}')">✓ 学会</button>
+                  <button class="btn btn-sm btn-warning" onclick="markAsForgotten('${filePath}', '${item.id}')">✗ 忘记</button>
+                  <button class="btn btn-sm btn-info" onclick="editKnowledgeItem('${filePath}', '${item.id}')">编辑</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteKnowledgeItem('${filePath}', '${item.id}')">删除</button>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `);
+}
+
+function addKnowledgeItem(filePath) {
+  hideModal();
+  setTimeout(() => {
+    showModal(`
+      <h2 style="margin-bottom: 20px; font-size: 24px;">添加知识点</h2>
+      <form onsubmit="submitKnowledgeItem(event, '${filePath}')">
+        <div class="form-group">
+          <label class="form-label">知识名 *</label>
+          <input type="text" name="name" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">知识概括</label>
+          <textarea name="brief" class="form-textarea" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">详细内容</label>
+          <textarea name="detail" class="form-textarea" rows="4"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">相关URL</label>
+          <input type="url" name="url" class="form-input">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">确定添加</button>
+      </form>
+    `);
+  }, 100);
+}
+
+function editKnowledgeItem(filePath, itemId) {
+  hideModal();
+  setTimeout(async () => {
+    try {
+      const items = await apiCall(`/api/knowledge/items?filePath=${encodeURIComponent(filePath)}`);
+      const item = items.find(i => i.id === itemId);
+      
+      if (!item) {
+        alert('知识项不存在');
+        return;
+      }
+      
+      showModal(`
+        <h2 style="margin-bottom: 20px; font-size: 24px;">编辑知识点</h2>
+        <form onsubmit="submitEditKnowledgeItem(event, '${filePath}', '${itemId}')">
+          <div class="form-group">
+            <label class="form-label">知识名 *</label>
+            <input type="text" name="name" class="form-input" value="${item.name}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">知识概括</label>
+            <textarea name="brief" class="form-textarea" rows="2">${item.brief || ''}</textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">详细内容</label>
+            <textarea name="detail" class="form-textarea" rows="4">${item.detail || ''}</textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">相关URL</label>
+            <input type="url" name="url" class="form-input" value="${item.url || ''}">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%;">保存修改</button>
+        </form>
+      `);
+    } catch (error) {
+      console.error('加载知识项失败:', error);
+    }
+  }, 100);
+}
+
+async function submitKnowledgeItem(e, filePath) {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const item = {
+    name: formData.get('name'),
+    brief: formData.get('brief'),
+    detail: formData.get('detail'),
+    url: formData.get('url'),
+    learnCount: 0,
+    forgetCount: 0
+  };
+  
+  await apiCall('/api/knowledge/item', {
+    method: 'POST',
+    body: JSON.stringify({ filePath, item })
+  });
+  
+  hideModal();
+  viewKnowledgeFile(filePath, filePath.split('/').pop().replace('.json', ''));
+}
+
+async function submitEditKnowledgeItem(e, filePath, itemId) {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const item = {
+    id: itemId,
+    name: formData.get('name'),
+    brief: formData.get('brief'),
+    detail: formData.get('detail'),
+    url: formData.get('url')
+  };
+  
+  await apiCall('/api/knowledge/item', {
+    method: 'POST',
+    body: JSON.stringify({ filePath, item })
+  });
+  
+  hideModal();
+  viewKnowledgeFile(filePath, filePath.split('/').pop().replace('.json', ''));
+}
+
+async function deleteKnowledgeItem(filePath, itemId) {
+  if (!confirm('确定要删除这个知识点吗？')) return;
+  
+  await apiCall('/api/knowledge/item', {
+    method: 'DELETE',
+    body: JSON.stringify({ filePath, itemId })
+  });
+  
+  hideModal();
+  viewKnowledgeFile(filePath, filePath.split('/').pop().replace('.json', ''));
+}
+
+async function markAsLearned(filePath, itemId) {
+  await apiCall('/api/knowledge/item/learn', {
+    method: 'POST',
+    body: JSON.stringify({
+      filePath,
+      itemId,
+      learners: AppState.knowledgeConfig.currentLearners,
+      targetAttributes: AppState.knowledgeConfig.targetAttributes
+    })
+  });
+  
+  hideModal();
+  viewKnowledgeFile(filePath, filePath.split('/').pop().replace('.json', ''));
+}
+
+async function markAsForgotten(filePath, itemId) {
+  await apiCall('/api/knowledge/item/forget', {
+    method: 'POST',
+    body: JSON.stringify({ filePath, itemId })
+  });
+  
+  hideModal();
+  viewKnowledgeFile(filePath, filePath.split('/').pop().replace('.json', ''));
+}
+
+function addRootCategory() {
+  showModal(`
+    <h2 style="margin-bottom: 20px; font-size: 24px;">添加知识大分类</h2>
+    <form onsubmit="submitRootCategory(event)">
+      <div class="form-group">
+        <label class="form-label">分类名称 *</label>
+        <input type="text" name="name" class="form-input" required placeholder="如：数学、语文、英语">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width: 100%;">确定添加</button>
+    </form>
+  `);
+}
+
+async function submitRootCategory(e) {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const name = formData.get('name');
+  
+  await apiCall('/api/knowledge/category', {
+    method: 'POST',
+    body: JSON.stringify({ name })
+  });
+  
+  hideModal();
+  renderKnowledgePage();
+}
+
+async function deleteRootCategory(name) {
+  if (!confirm(`确定要删除"${name}"分类吗？这将删除其下所有内容。`)) return;
+  
+  await apiCall('/api/knowledge/category', {
+    method: 'DELETE',
+    body: JSON.stringify({ categoryPath: name })
+  });
+  
+  renderKnowledgePage();
+}
+
+function enterCategory(name, category) {
+  AppState.currentKnowledgePath = name;
+  renderKnowledgeItems();
+}
+
+function navigateToPath(path) {
+  AppState.currentKnowledgePath = path;
+  if (path) {
+    renderKnowledgeItems();
+  } else {
+    renderKnowledgeStructure();
+  }
+}
+
+function addSubCategory() {
+  showModal(`
+    <h2 style="margin-bottom: 20px; font-size: 24px;">添加子分类</h2>
+    <form onsubmit="submitSubCategory(event)">
+      <div class="form-group">
+        <label class="form-label">类型 *</label>
+        <select name="isFile" class="form-select" required>
+          <option value="false">子目录（可继续包含子分类）</option>
+          <option value="true">知识文件（可添加知识点）</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">名称 *</label>
+        <input type="text" name="name" class="form-input" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width: 100%;">确定添加</button>
+    </form>
+  `);
+}
+
+async function submitSubCategory(e) {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const name = formData.get('name');
+  const isFile = formData.get('isFile') === 'true';
+  
+  await apiCall('/api/knowledge/subcategory', {
+    method: 'POST',
+    body: JSON.stringify({
+      parentPath: AppState.currentKnowledgePath,
+      name,
+      isFile
+    })
+  });
+  
+  hideModal();
+  await loadKnowledgeData();
+  renderKnowledgeItems();
+}
+
+async function updateKnowledgeConfig() {
+  const learnersSelect = document.getElementById('currentLearnersSelect');
+  const attributesSelect = document.getElementById('targetAttributesSelect');
+  
+  const selectedLearners = Array.from(learnersSelect.selectedOptions).map(opt => opt.value);
+  const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(opt => opt.value);
+  
+  const targetAttributes = {};
+  selectedAttributes.forEach(attrId => {
+    targetAttributes[attrId] = true;
+  });
+  
+  AppState.knowledgeConfig = {
+    currentLearners: selectedLearners,
+    targetAttributes
+  };
+  
+  await apiCall('/api/knowledge/config', {
+    method: 'PUT',
+    body: JSON.stringify(AppState.knowledgeConfig)
+  });
+}
+
+function showKnowledgeSubPage(page) {
+  AppState.knowledgeSubPage = page;
+  renderKnowledgePage();
+}
+
+// 自由学习模式
+function renderFreeLearning() {
+  const subNav = document.getElementById('subNav');
+  const contentArea = document.getElementById('contentArea');
+  
+  subNav.innerHTML = `
+    <button class="sub-nav-btn" onclick="showKnowledgeSubPage('categories')" style="background: #667eea; color: white;">← 返回知识库</button>
+    <div style="flex: 1;"></div>
+    <div style="font-size: 16px; color: #666;">
+      学习人: ${AppState.knowledgeConfig.currentLearners.map(id => {
+        const member = AppState.members.find(m => m.id === id);
+        return member ? member.name : '';
+      }).filter(n => n).join(', ') || '未选择'}
+    </div>
+  `;
+  
+  if (AppState.freeLearnItems.length === 0) {
+    contentArea.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">🎯 自由学习</h2>
+        </div>
+        <div style="padding: 30px;">
+          <p style="margin-bottom: 20px; font-size: 18px;">请选择学习范围：</p>
+          ${renderFreeLearningCategories(AppState.knowledgeStructure)}
+        </div>
+      </div>
+    `;
+  } else {
+    renderFreeLearningItem();
+  }
+}
+
+function renderFreeLearningCategories(categories, level = 0) {
+  return categories.map(cat => `
+    <div style="margin-left: ${level * 20}px; margin-bottom: 10px;">
+      ${cat.type === 'file' ? `
+        <button class="btn btn-primary" onclick="startFreeLearning('${cat.path}')" style="margin-bottom: 5px;">
+          📄 ${cat.name} (${cat.knowledgeItems.length}个知识点)
+        </button>
+      ` : `
+        <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">📁 ${cat.name}</div>
+        ${cat.children ? renderFreeLearningCategories(cat.children, level + 1) : ''}
+      `}
+    </div>
+  `).join('');
+}
+
+async function startFreeLearning(filePath) {
+  try {
+    const items = await apiCall(`/api/knowledge/items?filePath=${encodeURIComponent(filePath)}`);
+    
+    if (items.length === 0) {
+      alert('该分类下没有知识点');
+      return;
+    }
+    
+    // 随机打乱顺序
+    AppState.freeLearnItems = items.sort(() => Math.random() - 0.5);
+    AppState.freeLearnIndex = 0;
+    AppState.freeLearnShowDetail = false;
+    AppState.freeLearnFilePath = filePath;
+    
+    renderFreeLearningItem();
+  } catch (error) {
+    console.error('加载知识点失败:', error);
+  }
+}
+
+function renderFreeLearningItem() {
+  const contentArea = document.getElementById('contentArea');
+  const item = AppState.freeLearnItems[AppState.freeLearnIndex];
+  
+  if (!item) {
+    contentArea.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">🎉 学习完成！</h2>
+        </div>
+        <div style="padding: 50px; text-align: center;">
+          <p style="font-size: 24px; margin-bottom: 30px;">所有知识点已学习完毕</p>
+          <button class="btn btn-primary" onclick="exitFreeLearning()">返回</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  
+  const progress = `${AppState.freeLearnIndex + 1} / ${AppState.freeLearnItems.length}`;
+  
+  contentArea.innerHTML = `
+    <div class="card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <button class="btn btn-sm" onclick="exitFreeLearning()">← 返回</button>
+          <span style="margin-left: 15px; font-size: 18px;">进度: ${progress}</span>
+        </div>
+      </div>
+      <div style="padding: 50px; min-height: 400px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        ${!AppState.freeLearnShowDetail ? `
+          <div style="font-size: ${item.brief ? '72px' : '48px'}; font-weight: bold; text-align: center; margin-bottom: 40px;">
+            ${item.brief || item.name}
+          </div>
+          <button class="btn btn-primary" onclick="showFreeLearningDetail()" style="font-size: 20px; padding: 15px 40px;">
+            查看详情
+          </button>
+        ` : `
+          ${item.brief && item.brief !== item.name ? `
+            <div style="font-size: 72px; font-weight: bold; text-align: center; margin-bottom: 30px;">
+              ${item.brief}
+            </div>
+          ` : ''}
+          <div style="font-size: 32px; font-weight: bold; margin-bottom: 20px;">
+            ${item.name}
+          </div>
+          ${item.detail ? `
+            <div style="font-size: 20px; color: #666; margin-bottom: 20px; text-align: center; max-width: 800px;">
+              ${item.detail}
+            </div>
+          ` : ''}
+          ${item.url ? `
+            <div style="margin-bottom: 20px;">
+              <a href="${item.url}" target="_blank" style="font-size: 18px;">查看链接 →</a>
+            </div>
+          ` : ''}
+          <div style="display: flex; gap: 20px; margin-top: 40px;">
+            <button class="btn btn-success" onclick="freeLearningMarkLearned()" style="font-size: 18px; padding: 12px 30px;">
+              ✓ 学会了
+            </button>
+            <button class="btn btn-warning" onclick="freeLearningMarkForgotten()" style="font-size: 18px; padding: 12px 30px;">
+              ✗ 忘记了
+            </button>
+          </div>
+          <div style="display: flex; gap: 15px; margin-top: 30px;">
+            ${AppState.freeLearnIndex > 0 ? `
+              <button class="btn btn-info" onclick="freeLearningPrev()" style="font-size: 16px;">
+                ← 上一个
+              </button>
+            ` : ''}
+            <button class="btn btn-info" onclick="freeLearningNext()" style="font-size: 16px;">
+              下一个 →
+            </button>
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function showFreeLearningDetail() {
+  AppState.freeLearnShowDetail = true;
+  renderFreeLearningItem();
+}
+
+async function freeLearningMarkLearned() {
+  const item = AppState.freeLearnItems[AppState.freeLearnIndex];
+  await apiCall('/api/knowledge/item/learn', {
+    method: 'POST',
+    body: JSON.stringify({
+      filePath: AppState.freeLearnFilePath,
+      itemId: item.id,
+      learners: AppState.knowledgeConfig.currentLearners,
+      targetAttributes: AppState.knowledgeConfig.targetAttributes
+    })
+  });
+  
+  freeLearningNext();
+}
+
+async function freeLearningMarkForgotten() {
+  const item = AppState.freeLearnItems[AppState.freeLearnIndex];
+  await apiCall('/api/knowledge/item/forget', {
+    method: 'POST',
+    body: JSON.stringify({
+      filePath: AppState.freeLearnFilePath,
+      itemId: item.id
+    })
+  });
+  
+  freeLearningNext();
+}
+
+function freeLearningNext() {
+  AppState.freeLearnIndex++;
+  AppState.freeLearnShowDetail = false;
+  renderFreeLearningItem();
+}
+
+function freeLearningPrev() {
+  if (AppState.freeLearnIndex > 0) {
+    AppState.freeLearnIndex--;
+    AppState.freeLearnShowDetail = false;
+    renderFreeLearningItem();
+  }
+}
+
+function exitFreeLearning() {
+  AppState.freeLearnItems = [];
+  AppState.freeLearnIndex = 0;
+  AppState.freeLearnShowDetail = false;
+  AppState.freeLearnFilePath = null;
+  renderFreeLearning();
+}
+
+// 知识导入
+function renderKnowledgeImport() {
+  const subNav = document.getElementById('subNav');
+  const contentArea = document.getElementById('contentArea');
+  
+  subNav.innerHTML = `
+    <button class="sub-nav-btn" onclick="showKnowledgeSubPage('categories')" style="background: #667eea; color: white;">← 返回知识库</button>
+  `;
+  
+  contentArea.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">📥 知识录入</h2>
+      </div>
+      <div style="padding: 30px;">
+        <p style="margin-bottom: 20px; font-size: 18px;">请粘贴JSON格式的知识数据：</p>
+        <p style="margin-bottom: 15px; color: #666; font-size: 16px;">
+          格式示例：<br>
+          [{"levelRootName": "英语", "level1Name": "单词", "level2Name": "水果", "name": "apple", "brief": "apple", "detail": "苹果", "url": ""}]
+        </p>
+        <form onsubmit="submitKnowledgeImport(event)">
+          <div class="form-group">
+            <textarea id="importJsonData" class="form-textarea" rows="15" placeholder='[{"levelRootName": "...", ...}]' required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%;">开始导入</button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+async function submitKnowledgeImport(e) {
+  e.preventDefault();
+  
+  const jsonData = document.getElementById('importJsonData').value;
+  
+  try {
+    const data = JSON.parse(jsonData);
+    
+    if (!Array.isArray(data)) {
+      alert('JSON数据必须是数组格式');
+      return;
+    }
+    
+    const result = await apiCall('/api/knowledge/import', {
+      method: 'POST',
+      body: JSON.stringify({ data })
+    });
+    
+    alert(`成功导入 ${result.imported} 个知识点！`);
+    showKnowledgeSubPage('categories');
+  } catch (error) {
+    console.error('导入失败:', error);
+    alert('导入失败，请检查JSON格式是否正确');
+  }
 }
