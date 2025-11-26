@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拾荒者 - HomeStroy 游戏大厅</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #2d5016 0%, #1a3009 100%);
+      min-height: 100vh;
+      overflow: hidden;
+      color: white;
+    }
+
+    .game-container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .game-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+      z-index: 10;
+    }
+
+    .game-title {
+      font-size: 28px;
+      font-weight: bold;
+      text-shadow: 0 0 10px #8bc34a;
+    }
+
+    .stats {
+      display: flex;
+      gap: 30px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      opacity: 0.7;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #8bc34a;
+    }
+
+    .game-area {
+      position: absolute;
+      top: 80px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        rgba(139, 195, 74, 0.1),
+        rgba(139, 195, 74, 0.1) 10px,
+        transparent 10px,
+        transparent 20px
+      );
+    }
+
+    .player {
+      position: absolute;
+      font-size: 50px;
+      transition: all 0.1s;
+      z-index: 5;
+    }
+
+    .item {
+      position: absolute;
+      font-size: 40px;
+      animation: float 2s ease-in-out infinite;
+      cursor: pointer;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .collected {
+      animation: collect 0.3s ease-out forwards;
+    }
+
+    @keyframes collect {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+
+    .timer-bar {
+      position: absolute;
+      top: 70px;
+      left: 20px;
+      right: 20px;
+      height: 10px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .timer-fill {
+      height: 100%;
+      background: linear-gradient(to right, #ff4444, #ffaa00, #8bc34a);
+      transition: width 0.1s linear;
+    }
+
+    .start-screen, .game-over-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .start-screen.hidden, .game-over-screen.hidden {
+      display: none;
+    }
+
+    .start-screen h1 {
+      font-size: 72px;
+      margin-bottom: 20px;
+      text-shadow: 0 0 30px #8bc34a;
+    }
+
+    .start-screen p {
+      font-size: 20px;
+      margin-bottom: 30px;
+      opacity: 0.8;
+      max-width: 600px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .start-btn, .restart-btn {
+      padding: 20px 60px;
+      font-size: 24px;
+      background: linear-gradient(135deg, #8bc34a, #689f38);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      font-weight: bold;
+    }
+
+    .start-btn:hover, .restart-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 30px rgba(139, 195, 74, 0.5);
+    }
+
+    .game-over-screen h1 {
+      font-size: 64px;
+      margin-bottom: 30px;
+      color: #8bc34a;
+    }
+
+    .final-stats {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .final-stats p {
+      font-size: 24px;
+      margin: 10px 0;
+    }
+
+    .final-stats .final-score {
+      font-size: 72px;
+      color: #8bc34a;
+      margin: 20px 0;
+    }
+
+    .high-scores {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 30px;
+    }
+
+    .high-score-item {
+      text-align: center;
+      background: rgba(255,255,255,0.1);
+      padding: 15px 25px;
+      border-radius: 10px;
+    }
+
+    .high-score-label {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+
+    .high-score-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #ffff00;
+    }
+
+    .score-popup {
+      position: absolute;
+      font-size: 24px;
+      font-weight: bold;
+      color: #ffff00;
+      animation: popup 0.5s ease-out forwards;
+      pointer-events: none;
+    }
+
+    @keyframes popup {
+      0% { transform: translateY(0); opacity: 1; }
+      100% { transform: translateY(-50px); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container" id="gameContainer">
+    <div class="game-header">
+      <div class="game-title">🧹 拾荒者</div>
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-label">分数</div>
+          <div class="stat-value" id="score">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">已收集</div>
+          <div class="stat-value" id="collected">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="timer-bar">
+      <div class="timer-fill" id="timerFill"></div>
+    </div>
+
+    <div class="game-area" id="gameArea">
+      <div class="player" id="player">🏃</div>
+    </div>
+
+    <div class="start-screen" id="startScreen">
+      <h1>🧹 拾荒者</h1>
+      <p>
+        在限定时间内收集尽可能多的物品！<br>
+        使用方向键或WASD移动角色，靠近物品即可自动收集。<br>
+        不同物品有不同分值，稀有物品分数更高！<br>
+        游戏时间：60秒
+      </p>
+      <button class="start-btn" onclick="startGame()">开始游戏</button>
+    </div>
+
+    <div class="game-over-screen hidden" id="gameOverScreen">
+      <h1>⏰ 时间到！</h1>
+      <div class="final-stats">
+        <p>最终分数</p>
+        <div class="final-score" id="finalScore">0</div>
+        <p>收集物品: <span id="finalCollected">0</span> 个</p>
+      </div>
+      <div class="high-scores">
+        <div class="high-score-item">
+          <div class="high-score-label">今日最高</div>
+          <div class="high-score-value" id="dailyBest">0</div>
+        </div>
+        <div class="high-score-item">
+          <div class="high-score-label">本周最高</div>
+          <div class="high-score-value" id="weeklyBest">0</div>
+        </div>
+        <div class="high-score-item">
+          <div class="high-score-label">历史最高</div>
+          <div class="high-score-value" id="allTimeBest">0</div>
+        </div>
+      </div>
+      <button class="restart-btn" onclick="restartGame()">再来一局</button>
+    </div>
+  </div>
+
+  <script>
+    const GAME_ID = 'scavenger';
+    
+    let gameState = {
+      isRunning: false,
+      score: 0,
+      collected: 0,
+      timeLeft: 60,
+      playerX: 0,
+      playerY: 0,
+      items: [],
+      keys: { up: false, down: false, left: false, right: false },
+      speed: 8
+    };
+
+    const itemTypes = [
+      { emoji: '🍎', points: 1, rarity: 0.3 },
+      { emoji: '🍊', points: 1, rarity: 0.3 },
+      { emoji: '🥕', points: 2, rarity: 0.2 },
+      { emoji: '🍕', points: 2, rarity: 0.15 },
+      { emoji: '💎', points: 5, rarity: 0.03 },
+      { emoji: '👑', points: 10, rarity: 0.01 },
+      { emoji: '🎁', points: 3, rarity: 0.05 },
+      { emoji: '⭐', points: 4, rarity: 0.04 },
+      { emoji: '🍀', points: 3, rarity: 0.05 },
+      { emoji: '🔮', points: 8, rarity: 0.02 }
+    ];
+
+    let animationId = null;
+    let timerInterval = null;
+    const player = document.getElementById('player');
+    const gameArea = document.getElementById('gameArea');
+
+    async function loadHighScores() {
+      try {
+        const response = await fetch(`/api/game-scores/${GAME_ID}`);
+        return await response.json();
+      } catch (error) {
+        console.error('加载分数失败:', error);
+        return { dailyBest: { score: 0 }, weeklyBest: { score: 0 }, allTimeBest: { score: 0 } };
+      }
+    }
+
+    async function submitScore(finalScore) {
+      try {
+        const response = await fetch(`/api/game-scores/${GAME_ID}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ score: finalScore })
+        });
+        return await response.json();
+      } catch (error) {
+        console.error('提交分数失败:', error);
+        return { isNewRecord: false };
+      }
+    }
+
+    function getRandomItem() {
+      const rand = Math.random();
+      let cumulative = 0;
+      for (const item of itemTypes) {
+        cumulative += item.rarity;
+        if (rand <= cumulative) {
+          return item;
+        }
+      }
+      return itemTypes[0];
+    }
+
+    function spawnItem() {
+      const item = getRandomItem();
+      const x = Math.random() * (gameArea.clientWidth - 50) + 25;
+      const y = Math.random() * (gameArea.clientHeight - 100) + 50;
+      
+      const itemEl = document.createElement('div');
+      itemEl.className = 'item';
+      itemEl.textContent = item.emoji;
+      itemEl.style.left = x + 'px';
+      itemEl.style.top = y + 'px';
+      gameArea.appendChild(itemEl);
+      
+      gameState.items.push({
+        element: itemEl,
+        x: x,
+        y: y,
+        points: item.points
+      });
+    }
+
+    function showScorePopup(x, y, points) {
+      const popup = document.createElement('div');
+      popup.className = 'score-popup';
+      popup.textContent = '+' + points;
+      popup.style.left = x + 'px';
+      popup.style.top = y + 'px';
+      gameArea.appendChild(popup);
+      setTimeout(() => popup.remove(), 500);
+    }
+
+    function checkCollision() {
+      const playerSize = 50;
+      const collectDistance = 40;
+
+      gameState.items = gameState.items.filter(item => {
+        const dx = (gameState.playerX + playerSize/2) - (item.x + 20);
+        const dy = (gameState.playerY + playerSize/2) - (item.y + 20);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < collectDistance) {
+          item.element.classList.add('collected');
+          setTimeout(() => item.element.remove(), 300);
+          
+          gameState.score += item.points;
+          gameState.collected++;
+          
+          showScorePopup(item.x, item.y, item.points);
+          document.getElementById('score').textContent = gameState.score;
+          document.getElementById('collected').textContent = gameState.collected;
+          
+          return false;
+        }
+        return true;
+      });
+    }
+
+    function updateGame() {
+      if (!gameState.isRunning) return;
+
+      // Move player
+      if (gameState.keys.up) gameState.playerY = Math.max(0, gameState.playerY - gameState.speed);
+      if (gameState.keys.down) gameState.playerY = Math.min(gameArea.clientHeight - 60, gameState.playerY + gameState.speed);
+      if (gameState.keys.left) gameState.playerX = Math.max(0, gameState.playerX - gameState.speed);
+      if (gameState.keys.right) gameState.playerX = Math.min(gameArea.clientWidth - 50, gameState.playerX + gameState.speed);
+
+      player.style.left = gameState.playerX + 'px';
+      player.style.top = gameState.playerY + 'px';
+
+      // Spawn new items periodically
+      if (gameState.items.length < 15 && Math.random() < 0.05) {
+        spawnItem();
+      }
+
+      checkCollision();
+
+      animationId = requestAnimationFrame(updateGame);
+    }
+
+    function updateTimer() {
+      gameState.timeLeft--;
+      const percentage = (gameState.timeLeft / 60) * 100;
+      document.getElementById('timerFill').style.width = percentage + '%';
+
+      if (gameState.timeLeft <= 0) {
+        endGame();
+      }
+    }
+
+    function startGame() {
+      const areaRect = gameArea.getBoundingClientRect();
+      
+      gameState = {
+        isRunning: true,
+        score: 0,
+        collected: 0,
+        timeLeft: 60,
+        playerX: areaRect.width / 2 - 25,
+        playerY: areaRect.height / 2 - 30,
+        items: [],
+        keys: { up: false, down: false, left: false, right: false },
+        speed: 8
+      };
+
+      document.getElementById('score').textContent = '0';
+      document.getElementById('collected').textContent = '0';
+      document.getElementById('timerFill').style.width = '100%';
+      document.getElementById('startScreen').classList.add('hidden');
+      document.getElementById('gameOverScreen').classList.add('hidden');
+
+      // Clear existing items
+      document.querySelectorAll('.item').forEach(el => el.remove());
+
+      // Position player
+      player.style.left = gameState.playerX + 'px';
+      player.style.top = gameState.playerY + 'px';
+
+      // Spawn initial items
+      for (let i = 0; i < 10; i++) {
+        spawnItem();
+      }
+
+      timerInterval = setInterval(updateTimer, 1000);
+      animationId = requestAnimationFrame(updateGame);
+    }
+
+    async function endGame() {
+      gameState.isRunning = false;
+      if (animationId) cancelAnimationFrame(animationId);
+      if (timerInterval) clearInterval(timerInterval);
+
+      document.getElementById('finalScore').textContent = gameState.score;
+      document.getElementById('finalCollected').textContent = gameState.collected;
+      
+      const result = await submitScore(gameState.score);
+      
+      document.getElementById('dailyBest').textContent = result.dailyBest || 0;
+      document.getElementById('weeklyBest').textContent = result.weeklyBest || 0;
+      document.getElementById('allTimeBest').textContent = result.allTimeBest || 0;
+
+      document.getElementById('gameOverScreen').classList.remove('hidden');
+    }
+
+    function restartGame() {
+      document.getElementById('gameOverScreen').classList.add('hidden');
+      startGame();
+    }
+
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      switch (e.key.toLowerCase()) {
+        case 'arrowup':
+        case 'w':
+          gameState.keys.up = true;
+          break;
+        case 'arrowdown':
+        case 's':
+          gameState.keys.down = true;
+          break;
+        case 'arrowleft':
+        case 'a':
+          gameState.keys.left = true;
+          break;
+        case 'arrowright':
+        case 'd':
+          gameState.keys.right = true;
+          break;
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      switch (e.key.toLowerCase()) {
+        case 'arrowup':
+        case 'w':
+          gameState.keys.up = false;
+          break;
+        case 'arrowdown':
+        case 's':
+          gameState.keys.down = false;
+          break;
+        case 'arrowleft':
+        case 'a':
+          gameState.keys.left = false;
+          break;
+        case 'arrowright':
+        case 'd':
+          gameState.keys.right = false;
+          break;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -48,13 +48,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupNavigation() {
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
+      const page = item.dataset.page;
+      
+      // 处理游戏大厅的展开/收起
+      if (page === 'games') {
+        item.classList.toggle('expanded');
+        const submenu = document.getElementById('gamesSubmenu');
+        submenu.classList.toggle('show');
+        return;
+      }
+      
       document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
       item.classList.add('active');
-      const page = item.dataset.page;
       AppState.currentPage = page;
       renderPage(page);
     });
   });
+  
+  // 设置游戏子菜单点击事件
+  document.querySelectorAll('.nav-submenu-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const gameId = item.dataset.game;
+      openGameWindow(gameId);
+    });
+  });
+}
+
+// 打开游戏窗口
+function openGameWindow(gameId) {
+  const gameUrls = {
+    'spider-run': '/games/spider-run.html',
+    '2048': '/games/2048.html',
+    'starship-typing': '/games/starship-typing.html',
+    'scavenger': '/games/scavenger.html',
+    'hanzi-master': '/games/hanzi-master.html',
+    'word-expert': '/games/word-expert.html'
+  };
+  
+  const url = gameUrls[gameId];
+  if (url) {
+    window.open(url, '_blank', 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no');
+  }
 }
 
 // 设置模态框
