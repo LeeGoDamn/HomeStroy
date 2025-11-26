@@ -607,6 +607,132 @@ app.post('/api/knowledge/import', (req, res) => {
   res.json({ success: true, imported });
 });
 
+// ========== 游戏分数 API ==========
+
+// 获取本周一的日期字符串
+function getWeekStart(date) {
+  const dayOfWeek = date.getDay();
+  const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - mondayOffset);
+  return monday.toISOString().split('T')[0];
+}
+
+// 获取游戏分数
+app.get('/api/game-scores/:gameId', (req, res) => {
+  const gameId = req.params.gameId;
+  
+  // 验证键名安全性
+  if (!isSafeKey(gameId)) {
+    return res.status(400).json({ error: '无效的游戏ID' });
+  }
+  
+  const scores = readJSON('game-scores.json') || {};
+  const gameScores = scores[gameId] || {
+    dailyBest: { score: 0, date: null },
+    weeklyBest: { score: 0, weekStart: null },
+    allTimeBest: { score: 0, date: null },
+    history: []
+  };
+  
+  // 检查是否需要重置每日/每周最高分
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const weekStart = getWeekStart(now);
+  
+  // 重置每日最高分（如果是新的一天）
+  if (gameScores.dailyBest.date !== today) {
+    gameScores.dailyBest = { score: 0, date: today };
+  }
+  
+  // 重置每周最高分（如果是新的一周）
+  if (gameScores.weeklyBest.weekStart !== weekStart) {
+    gameScores.weeklyBest = { score: 0, weekStart: weekStart };
+  }
+  
+  res.json(gameScores);
+});
+
+// 提交游戏分数
+app.post('/api/game-scores/:gameId', (req, res) => {
+  const gameId = req.params.gameId;
+  const { score } = req.body;
+  
+  // 验证键名安全性
+  if (!isSafeKey(gameId)) {
+    return res.status(400).json({ error: '无效的游戏ID' });
+  }
+  
+  if (typeof score !== 'number' || score < 0) {
+    return res.status(400).json({ error: '无效的分数' });
+  }
+  
+  const scores = readJSON('game-scores.json') || {};
+  
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const weekStart = getWeekStart(now);
+  
+  if (!scores[gameId]) {
+    scores[gameId] = {
+      dailyBest: { score: 0, date: today },
+      weeklyBest: { score: 0, weekStart: weekStart },
+      allTimeBest: { score: 0, date: null },
+      history: []
+    };
+  }
+  
+  const gameScores = scores[gameId];
+  
+  // 重置每日最高分（如果是新的一天）
+  if (gameScores.dailyBest.date !== today) {
+    gameScores.dailyBest = { score: 0, date: today };
+  }
+  
+  // 重置每周最高分（如果是新的一周）
+  if (gameScores.weeklyBest.weekStart !== weekStart) {
+    gameScores.weeklyBest = { score: 0, weekStart: weekStart };
+  }
+  
+  // 更新分数
+  let isNewRecord = false;
+  
+  if (score > gameScores.dailyBest.score) {
+    gameScores.dailyBest.score = score;
+    isNewRecord = true;
+  }
+  
+  if (score > gameScores.weeklyBest.score) {
+    gameScores.weeklyBest.score = score;
+    isNewRecord = true;
+  }
+  
+  if (score > gameScores.allTimeBest.score) {
+    gameScores.allTimeBest.score = score;
+    gameScores.allTimeBest.date = now.toISOString();
+    isNewRecord = true;
+  }
+  
+  // 添加到历史记录（保留最近50条）
+  gameScores.history.unshift({
+    score,
+    date: now.toISOString()
+  });
+  if (gameScores.history.length > 50) {
+    gameScores.history = gameScores.history.slice(0, 50);
+  }
+  
+  writeJSON('game-scores.json', scores);
+  
+  res.json({
+    success: true,
+    isNewRecord,
+    dailyBest: gameScores.dailyBest.score,
+    weeklyBest: gameScores.weeklyBest.score,
+    allTimeBest: gameScores.allTimeBest.score
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`服务器运行在 http://localhost:${PORT}`);
 });

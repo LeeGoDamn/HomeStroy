@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>单词小专家 - HomeStroy 游戏大厅</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #3498db 0%, #2c3e50 100%);
+      min-height: 100vh;
+      color: white;
+    }
+
+    .game-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .game-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .game-title {
+      font-size: 36px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+
+    .stat-item {
+      background: rgba(255,255,255,0.2);
+      padding: 10px 25px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .game-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+    }
+
+    .word-display {
+      font-size: 72px;
+      margin-bottom: 15px;
+      text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .phonetic {
+      font-size: 24px;
+      opacity: 0.8;
+      margin-bottom: 30px;
+    }
+
+    .options {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    .option-btn {
+      padding: 20px 30px;
+      font-size: 20px;
+      background: white;
+      color: #333;
+      border: none;
+      border-radius: 15px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 500;
+    }
+
+    .option-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    }
+
+    .option-btn.correct {
+      background: #27ae60;
+      color: white;
+    }
+
+    .option-btn.wrong {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .timer-bar {
+      width: 100%;
+      max-width: 600px;
+      height: 10px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 5px;
+      margin-top: 30px;
+      overflow: hidden;
+    }
+
+    .timer-fill {
+      height: 100%;
+      background: white;
+      transition: width 0.1s linear;
+    }
+
+    .start-screen, .game-over-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .start-screen.hidden, .game-over-screen.hidden {
+      display: none;
+    }
+
+    .start-screen h1 {
+      font-size: 72px;
+      margin-bottom: 20px;
+      text-shadow: 0 0 30px #3498db;
+    }
+
+    .start-screen p {
+      font-size: 20px;
+      margin-bottom: 30px;
+      opacity: 0.8;
+      max-width: 600px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .level-selector {
+      margin-bottom: 30px;
+    }
+
+    .level-selector label {
+      display: block;
+      margin-bottom: 15px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .level-selector input[type="radio"] {
+      margin-right: 10px;
+      width: 20px;
+      height: 20px;
+    }
+
+    .start-btn, .restart-btn {
+      padding: 20px 60px;
+      font-size: 24px;
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      font-weight: bold;
+    }
+
+    .start-btn:hover, .restart-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 30px rgba(52, 152, 219, 0.5);
+    }
+
+    .game-over-screen h1 {
+      font-size: 64px;
+      margin-bottom: 30px;
+      color: #3498db;
+    }
+
+    .final-stats {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .final-stats p {
+      font-size: 20px;
+      margin: 10px 0;
+    }
+
+    .final-stats .final-score {
+      font-size: 72px;
+      color: #3498db;
+      margin: 20px 0;
+    }
+
+    .high-scores {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .high-score-item {
+      text-align: center;
+      background: rgba(255,255,255,0.1);
+      padding: 15px 25px;
+      border-radius: 10px;
+    }
+
+    .high-score-label {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+
+    .high-score-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #f1c40f;
+    }
+
+    .streak-display {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 18px;
+    }
+
+    .streak-display.hot {
+      background: linear-gradient(135deg, #f39c12, #e74c3c);
+      animation: pulse 0.5s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.05); }
+    }
+
+    .progress-info {
+      font-size: 16px;
+      opacity: 0.8;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <div class="game-header">
+      <div class="game-title">📖 单词小专家</div>
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-label">分数</div>
+          <div class="stat-value" id="score">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">正确</div>
+          <div class="stat-value" id="correct">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">错误</div>
+          <div class="stat-value" id="wrong">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="streak-display" id="streakDisplay">
+      🔥 连击: <span id="streak">0</span>
+    </div>
+
+    <div class="game-area">
+      <div class="progress-info" id="progressInfo">题目 1/20</div>
+      <div class="word-display" id="wordDisplay">word</div>
+      <div class="phonetic" id="phonetic">/wɜːrd/</div>
+      <div class="options" id="options"></div>
+      <div class="timer-bar">
+        <div class="timer-fill" id="timerFill"></div>
+      </div>
+    </div>
+
+    <div class="start-screen" id="startScreen">
+      <h1>📖 单词小专家</h1>
+      <p>
+        测试你的英语词汇量！<br>
+        根据显示的英文单词，选择正确的中文含义。<br>
+        回答越快，得分越高！连续答对可获得连击加分！
+      </p>
+      <div class="level-selector">
+        <label>
+          <input type="radio" name="level" value="easy" checked>
+          初级 - 常用简单词汇
+        </label>
+        <label>
+          <input type="radio" name="level" value="medium">
+          中级 - 日常词汇
+        </label>
+        <label>
+          <input type="radio" name="level" value="hard">
+          高级 - 进阶词汇
+        </label>
+      </div>
+      <button class="start-btn" onclick="startGame()">开始游戏</button>
+    </div>
+
+    <div class="game-over-screen hidden" id="gameOverScreen">
+      <h1>🎓 游戏结束</h1>
+      <div class="final-stats">
+        <p>最终分数</p>
+        <div class="final-score" id="finalScore">0</div>
+        <p>正确: <span id="finalCorrect">0</span> | 错误: <span id="finalWrong">0</span></p>
+        <p>正确率: <span id="accuracy">0</span>%</p>
+        <p>最高连击: <span id="maxStreak">0</span></p>
+      </div>
+      <div class="high-scores">
+        <div class="high-score-item">
+          <div class="high-score-label">今日最高</div>
+          <div class="high-score-value" id="dailyBest">0</div>
+        </div>
+        <div class="high-score-item">
+          <div class="high-score-label">本周最高</div>
+          <div class="high-score-value" id="weeklyBest">0</div>
+        </div>
+        <div class="high-score-item">
+          <div class="high-score-label">历史最高</div>
+          <div class="high-score-value" id="allTimeBest">0</div>
+        </div>
+      </div>
+      <button class="restart-btn" onclick="restartGame()">再来一局</button>
+    </div>
+  </div>
+
+  <script>
+    const GAME_ID = 'word-expert';
+    
+    const wordDatabase = {
+      easy: [
+        { word: 'apple', phonetic: '/ˈæpl/', meaning: '苹果' },
+        { word: 'book', phonetic: '/bʊk/', meaning: '书' },
+        { word: 'cat', phonetic: '/kæt/', meaning: '猫' },
+        { word: 'dog', phonetic: '/dɒɡ/', meaning: '狗' },
+        { word: 'egg', phonetic: '/eɡ/', meaning: '鸡蛋' },
+        { word: 'fish', phonetic: '/fɪʃ/', meaning: '鱼' },
+        { word: 'girl', phonetic: '/ɡɜːrl/', meaning: '女孩' },
+        { word: 'happy', phonetic: '/ˈhæpi/', meaning: '快乐的' },
+        { word: 'ice', phonetic: '/aɪs/', meaning: '冰' },
+        { word: 'jump', phonetic: '/dʒʌmp/', meaning: '跳' },
+        { word: 'king', phonetic: '/kɪŋ/', meaning: '国王' },
+        { word: 'love', phonetic: '/lʌv/', meaning: '爱' },
+        { word: 'moon', phonetic: '/muːn/', meaning: '月亮' },
+        { word: 'name', phonetic: '/neɪm/', meaning: '名字' },
+        { word: 'open', phonetic: '/ˈoʊpən/', meaning: '打开' },
+        { word: 'play', phonetic: '/pleɪ/', meaning: '玩' },
+        { word: 'queen', phonetic: '/kwiːn/', meaning: '女王' },
+        { word: 'run', phonetic: '/rʌn/', meaning: '跑' },
+        { word: 'sun', phonetic: '/sʌn/', meaning: '太阳' },
+        { word: 'tree', phonetic: '/triː/', meaning: '树' },
+        { word: 'water', phonetic: '/ˈwɔːtər/', meaning: '水' },
+        { word: 'yellow', phonetic: '/ˈjeloʊ/', meaning: '黄色的' },
+        { word: 'zoo', phonetic: '/zuː/', meaning: '动物园' },
+        { word: 'bird', phonetic: '/bɜːrd/', meaning: '鸟' },
+        { word: 'flower', phonetic: '/ˈflaʊər/', meaning: '花' }
+      ],
+      medium: [
+        { word: 'adventure', phonetic: '/ədˈventʃər/', meaning: '冒险' },
+        { word: 'beautiful', phonetic: '/ˈbjuːtɪfl/', meaning: '美丽的' },
+        { word: 'celebrate', phonetic: '/ˈselɪbreɪt/', meaning: '庆祝' },
+        { word: 'discover', phonetic: '/dɪˈskʌvər/', meaning: '发现' },
+        { word: 'excellent', phonetic: '/ˈeksələnt/', meaning: '极好的' },
+        { word: 'familiar', phonetic: '/fəˈmɪliər/', meaning: '熟悉的' },
+        { word: 'generous', phonetic: '/ˈdʒenərəs/', meaning: '慷慨的' },
+        { word: 'horizon', phonetic: '/həˈraɪzn/', meaning: '地平线' },
+        { word: 'imagine', phonetic: '/ɪˈmædʒɪn/', meaning: '想象' },
+        { word: 'journey', phonetic: '/ˈdʒɜːrni/', meaning: '旅程' },
+        { word: 'knowledge', phonetic: '/ˈnɒlɪdʒ/', meaning: '知识' },
+        { word: 'language', phonetic: '/ˈlæŋɡwɪdʒ/', meaning: '语言' },
+        { word: 'mountain', phonetic: '/ˈmaʊntən/', meaning: '山' },
+        { word: 'neighbor', phonetic: '/ˈneɪbər/', meaning: '邻居' },
+        { word: 'opportunity', phonetic: '/ˌɒpərˈtuːnəti/', meaning: '机会' },
+        { word: 'patience', phonetic: '/ˈpeɪʃns/', meaning: '耐心' },
+        { word: 'quality', phonetic: '/ˈkwɒləti/', meaning: '质量' },
+        { word: 'remember', phonetic: '/rɪˈmembər/', meaning: '记住' },
+        { word: 'success', phonetic: '/səkˈses/', meaning: '成功' },
+        { word: 'treasure', phonetic: '/ˈtreʒər/', meaning: '宝藏' },
+        { word: 'universe', phonetic: '/ˈjuːnɪvɜːrs/', meaning: '宇宙' },
+        { word: 'volunteer', phonetic: '/ˌvɒlənˈtɪər/', meaning: '志愿者' },
+        { word: 'wonderful', phonetic: '/ˈwʌndərfl/', meaning: '精彩的' },
+        { word: 'yesterday', phonetic: '/ˈjestərdeɪ/', meaning: '昨天' },
+        { word: 'experience', phonetic: '/ɪkˈspɪəriəns/', meaning: '经验' }
+      ],
+      hard: [
+        { word: 'accomplish', phonetic: '/əˈkɒmplɪʃ/', meaning: '完成' },
+        { word: 'benevolent', phonetic: '/bəˈnevələnt/', meaning: '仁慈的' },
+        { word: 'comprehensive', phonetic: '/ˌkɒmprɪˈhensɪv/', meaning: '全面的' },
+        { word: 'deteriorate', phonetic: '/dɪˈtɪəriəreɪt/', meaning: '恶化' },
+        { word: 'enthusiasm', phonetic: '/ɪnˈθjuːziæzəm/', meaning: '热情' },
+        { word: 'fundamental', phonetic: '/ˌfʌndəˈmentl/', meaning: '基本的' },
+        { word: 'gratitude', phonetic: '/ˈɡrætɪtjuːd/', meaning: '感激' },
+        { word: 'hypothesis', phonetic: '/haɪˈpɒθəsɪs/', meaning: '假设' },
+        { word: 'inevitable', phonetic: '/ɪnˈevɪtəbl/', meaning: '不可避免的' },
+        { word: 'jurisdiction', phonetic: '/ˌdʒʊərɪsˈdɪkʃn/', meaning: '管辖权' },
+        { word: 'knowledgeable', phonetic: '/ˈnɒlɪdʒəbl/', meaning: '博学的' },
+        { word: 'legitimate', phonetic: '/lɪˈdʒɪtɪmət/', meaning: '合法的' },
+        { word: 'magnificent', phonetic: '/mæɡˈnɪfɪsnt/', meaning: '壮丽的' },
+        { word: 'negligible', phonetic: '/ˈneɡlɪdʒəbl/', meaning: '可忽略的' },
+        { word: 'phenomenon', phonetic: '/fɪˈnɒmɪnən/', meaning: '现象' },
+        { word: 'quintessential', phonetic: '/ˌkwɪntɪˈsenʃl/', meaning: '典型的' },
+        { word: 'resilience', phonetic: '/rɪˈzɪliəns/', meaning: '韧性' },
+        { word: 'sophisticated', phonetic: '/səˈfɪstɪkeɪtɪd/', meaning: '复杂的' },
+        { word: 'tremendous', phonetic: '/trəˈmendəs/', meaning: '巨大的' },
+        { word: 'ubiquitous', phonetic: '/juːˈbɪkwɪtəs/', meaning: '无处不在的' },
+        { word: 'vulnerable', phonetic: '/ˈvʌlnərəbl/', meaning: '脆弱的' },
+        { word: 'whimsical', phonetic: '/ˈwɪmzɪkl/', meaning: '异想天开的' },
+        { word: 'xenophobia', phonetic: '/ˌzenəˈfoʊbiə/', meaning: '仇外心理' },
+        { word: 'zealous', phonetic: '/ˈzeləs/', meaning: '热心的' },
+        { word: 'ambiguous', phonetic: '/æmˈbɪɡjuəs/', meaning: '模糊的' }
+      ]
+    };
+
+    let gameState = {
+      isRunning: false,
+      level: 'easy',
+      score: 0,
+      correct: 0,
+      wrong: 0,
+      streak: 0,
+      maxStreak: 0,
+      currentQuestion: null,
+      timeLeft: 10,
+      questionCount: 0,
+      maxQuestions: 20,
+      usedWords: []
+    };
+
+    let questionTimer = null;
+
+    async function loadHighScores() {
+      try {
+        const response = await fetch(`/api/game-scores/${GAME_ID}`);
+        return await response.json();
+      } catch (error) {
+        console.error('加载分数失败:', error);
+        return { dailyBest: { score: 0 }, weeklyBest: { score: 0 }, allTimeBest: { score: 0 } };
+      }
+    }
+
+    async function submitScore(finalScore) {
+      try {
+        const response = await fetch(`/api/game-scores/${GAME_ID}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ score: finalScore })
+        });
+        return await response.json();
+      } catch (error) {
+        console.error('提交分数失败:', error);
+        return { isNewRecord: false };
+      }
+    }
+
+    function shuffleArray(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function generateQuestion() {
+      const wordList = wordDatabase[gameState.level];
+      const availableWords = wordList.filter(w => !gameState.usedWords.includes(w.word));
+      
+      if (availableWords.length < 4) {
+        gameState.usedWords = [];
+        return generateQuestion();
+      }
+
+      const correctWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+      gameState.usedWords.push(correctWord.word);
+      
+      const wrongWords = shuffleArray(wordList.filter(w => w.word !== correctWord.word)).slice(0, 3);
+      
+      const options = shuffleArray([correctWord.meaning, ...wrongWords.map(w => w.meaning)]);
+      
+      gameState.currentQuestion = {
+        word: correctWord.word,
+        phonetic: correctWord.phonetic,
+        correctAnswer: correctWord.meaning,
+        options: options
+      };
+
+      document.getElementById('progressInfo').textContent = 
+        `题目 ${gameState.questionCount + 1}/${gameState.maxQuestions}`;
+      document.getElementById('wordDisplay').textContent = correctWord.word;
+      document.getElementById('wordDisplay').style.animation = 'none';
+      setTimeout(() => {
+        document.getElementById('wordDisplay').style.animation = 'fadeIn 0.3s ease';
+      }, 10);
+      document.getElementById('phonetic').textContent = correctWord.phonetic;
+
+      const optionsContainer = document.getElementById('options');
+      optionsContainer.innerHTML = options.map((opt, i) => 
+        `<button class="option-btn" onclick="selectAnswer('${opt}')">${opt}</button>`
+      ).join('');
+
+      gameState.timeLeft = 10;
+      document.getElementById('timerFill').style.width = '100%';
+    }
+
+    function selectAnswer(answer) {
+      if (!gameState.isRunning) return;
+
+      const buttons = document.querySelectorAll('.option-btn');
+      buttons.forEach(btn => btn.disabled = true);
+
+      const isCorrect = answer === gameState.currentQuestion.correctAnswer;
+
+      buttons.forEach(btn => {
+        if (btn.textContent === gameState.currentQuestion.correctAnswer) {
+          btn.classList.add('correct');
+        } else if (btn.textContent === answer && !isCorrect) {
+          btn.classList.add('wrong');
+        }
+      });
+
+      if (isCorrect) {
+        const timeBonus = Math.floor(gameState.timeLeft);
+        const streakBonus = Math.min(gameState.streak, 10);
+        const points = 10 + timeBonus + streakBonus;
+        
+        gameState.score += points;
+        gameState.correct++;
+        gameState.streak++;
+        if (gameState.streak > gameState.maxStreak) {
+          gameState.maxStreak = gameState.streak;
+        }
+      } else {
+        gameState.wrong++;
+        gameState.streak = 0;
+      }
+
+      updateDisplay();
+      gameState.questionCount++;
+
+      setTimeout(() => {
+        if (gameState.questionCount >= gameState.maxQuestions) {
+          endGame();
+        } else {
+          generateQuestion();
+        }
+      }, 1000);
+    }
+
+    function updateDisplay() {
+      document.getElementById('score').textContent = gameState.score;
+      document.getElementById('correct').textContent = gameState.correct;
+      document.getElementById('wrong').textContent = gameState.wrong;
+      document.getElementById('streak').textContent = gameState.streak;
+
+      const streakDisplay = document.getElementById('streakDisplay');
+      if (gameState.streak >= 5) {
+        streakDisplay.classList.add('hot');
+      } else {
+        streakDisplay.classList.remove('hot');
+      }
+    }
+
+    function updateQuestionTimer() {
+      gameState.timeLeft -= 0.1;
+      const percentage = (gameState.timeLeft / 10) * 100;
+      document.getElementById('timerFill').style.width = Math.max(0, percentage) + '%';
+
+      if (gameState.timeLeft <= 0) {
+        selectAnswer('');
+      }
+    }
+
+    function startGame() {
+      const selectedLevel = document.querySelector('input[name="level"]:checked').value;
+      
+      gameState = {
+        isRunning: true,
+        level: selectedLevel,
+        score: 0,
+        correct: 0,
+        wrong: 0,
+        streak: 0,
+        maxStreak: 0,
+        currentQuestion: null,
+        timeLeft: 10,
+        questionCount: 0,
+        maxQuestions: 20,
+        usedWords: []
+      };
+
+      updateDisplay();
+      document.getElementById('startScreen').classList.add('hidden');
+      document.getElementById('gameOverScreen').classList.add('hidden');
+
+      questionTimer = setInterval(updateQuestionTimer, 100);
+      generateQuestion();
+    }
+
+    async function endGame() {
+      gameState.isRunning = false;
+      if (questionTimer) clearInterval(questionTimer);
+
+      const total = gameState.correct + gameState.wrong;
+      const accuracy = total > 0 ? Math.round((gameState.correct / total) * 100) : 0;
+
+      document.getElementById('finalScore').textContent = gameState.score;
+      document.getElementById('finalCorrect').textContent = gameState.correct;
+      document.getElementById('finalWrong').textContent = gameState.wrong;
+      document.getElementById('accuracy').textContent = accuracy;
+      document.getElementById('maxStreak').textContent = gameState.maxStreak;
+      
+      const result = await submitScore(gameState.score);
+      
+      document.getElementById('dailyBest').textContent = result.dailyBest || 0;
+      document.getElementById('weeklyBest').textContent = result.weeklyBest || 0;
+      document.getElementById('allTimeBest').textContent = result.allTimeBest || 0;
+
+      document.getElementById('gameOverScreen').classList.remove('hidden');
+    }
+
+    function restartGame() {
+      document.getElementById('gameOverScreen').classList.add('hidden');
+      document.getElementById('startScreen').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>

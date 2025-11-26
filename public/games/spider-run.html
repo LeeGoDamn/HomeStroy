@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>蜘蛛侠跑酷 - HomeStroy 游戏大厅</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      overflow: hidden;
+      color: white;
+    }
+
+    .game-container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .game-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+      z-index: 10;
+    }
+
+    .game-title {
+      font-size: 28px;
+      font-weight: bold;
+      text-shadow: 0 0 10px #ff0040;
+    }
+
+    .stats {
+      display: flex;
+      gap: 30px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      opacity: 0.7;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #ff0040;
+    }
+
+    .game-area {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 300px;
+      background: linear-gradient(to top, #1a1a2e, transparent);
+    }
+
+    .ground {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: linear-gradient(to top, #333, #555);
+    }
+
+    .player {
+      position: absolute;
+      bottom: 60px;
+      left: 100px;
+      width: 50px;
+      height: 80px;
+      font-size: 60px;
+      transition: bottom 0.1s;
+      z-index: 5;
+    }
+
+    .player.jumping {
+      animation: jump 0.6s ease;
+    }
+
+    @keyframes jump {
+      0%, 100% { bottom: 60px; }
+      50% { bottom: 200px; }
+    }
+
+    .obstacle {
+      position: absolute;
+      bottom: 60px;
+      font-size: 50px;
+      animation: moveLeft 2s linear;
+    }
+
+    @keyframes moveLeft {
+      from { right: -50px; }
+      to { right: 100%; }
+    }
+
+    .city-bg {
+      position: absolute;
+      bottom: 60px;
+      left: 0;
+      right: 0;
+      height: 400px;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect fill="%23222" x="10" y="30" width="30" height="70"/><rect fill="%23333" x="50" y="50" width="25" height="50"/><rect fill="%23222" x="85" y="20" width="35" height="80"/><rect fill="%23333" x="130" y="40" width="20" height="60"/><rect fill="%23222" x="160" y="25" width="30" height="75"/></svg>') repeat-x bottom;
+      background-size: 300px 200px;
+      opacity: 0.3;
+      animation: scrollBg 20s linear infinite;
+    }
+
+    @keyframes scrollBg {
+      from { background-position-x: 0; }
+      to { background-position-x: -300px; }
+    }
+
+    .start-screen, .game-over-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .start-screen.hidden, .game-over-screen.hidden {
+      display: none;
+    }
+
+    .start-screen h1 {
+      font-size: 72px;
+      margin-bottom: 20px;
+      text-shadow: 0 0 30px #ff0040;
+    }
+
+    .start-screen p {
+      font-size: 20px;
+      margin-bottom: 30px;
+      opacity: 0.8;
+      max-width: 600px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .start-btn, .restart-btn {
+      padding: 20px 60px;
+      font-size: 24px;
+      background: linear-gradient(135deg, #ff0040, #cc0033);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      font-weight: bold;
+    }
+
+    .start-btn:hover, .restart-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 30px rgba(255, 0, 64, 0.5);
+    }
+
+    .game-over-screen h1 {
+      font-size: 64px;
+      margin-bottom: 30px;
+      color: #ff0040;
+    }
+
+    .final-stats {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .final-stats p {
+      font-size: 24px;
+      margin: 10px 0;
+    }
+
+    .final-stats .final-score {
+      font-size: 72px;
+      color: #ff0040;
+      margin: 20px 0;
+    }
+
+    .high-scores {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 30px;
+    }
+
+    .high-score-item {
+      text-align: center;
+      background: rgba(255,255,255,0.1);
+      padding: 15px 25px;
+      border-radius: 10px;
+    }
+
+    .high-score-label {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+
+    .high-score-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #ffff00;
+    }
+
+    .web-line {
+      position: absolute;
+      width: 3px;
+      background: linear-gradient(to bottom, transparent, #fff, transparent);
+      transform-origin: top center;
+      z-index: 4;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container" id="gameContainer">
+    <div class="city-bg"></div>
+    
+    <div class="game-header">
+      <div class="game-title">🕷️ 蜘蛛侠跑酷</div>
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-label">分数</div>
+          <div class="stat-value" id="score">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">距离</div>
+          <div class="stat-value" id="distance">0m</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-area">
+      <div class="ground"></div>
+      <div class="player" id="player">🕷️</div>
+    </div>
+
+    <div class="start-screen" id="startScreen">
+      <h1>🕷️ 蜘蛛侠跑酷</h1>
+      <p>
+        化身蜘蛛侠在城市中穿梭！<br>
+        按空格键或点击屏幕跳跃躲避障碍物。<br>
+        跑得越远，分数越高！
+      </p>
+      <button class="start-btn" onclick="startGame()">开始游戏</button>
+    </div>
+
+    <div class="game-over-screen hidden" id="gameOverScreen">
+      <h1>💥 游戏结束</h1>
+      <div class="final-stats">
+        <p>最终分数</p>
+        <div class="final-score" id="finalScore">0</div>
+      </div>
+      <div class="high-scores">
+        <div class="high-score-item">
+          <div class="high-score-label">今日最高</div>
+          <div class="high-score-value" id="dailyBest">0</div>
+        </div>
+        <div class="high-score-item">
+          <div class="high-score-label">本周最高</div>
+          <div class="high-score-value" id="weeklyBest">0</div>
+        </div>
+        <div class="high-score-item">
+          <div class="high-score-label">历史最高</div>
+          <div class="high-score-value" id="allTimeBest">0</div>
+        </div>
+      </div>
+      <button class="restart-btn" onclick="restartGame()">再来一局</button>
+    </div>
+  </div>
+
+  <script>
+    const GAME_ID = 'spider-run';
+    
+    let gameState = {
+      isRunning: false,
+      score: 0,
+      distance: 0,
+      isJumping: false,
+      obstacles: [],
+      obstacleTypes: ['🏢', '🚗', '📦', '🗑️', '🚧'],
+      spawnInterval: 2000,
+      lastSpawnTime: 0,
+      speed: 5,
+      playerY: 60,
+      velocityY: 0,
+      gravity: 0.8,
+      jumpForce: -15
+    };
+
+    let animationId = null;
+    const player = document.getElementById('player');
+
+    async function loadHighScores() {
+      try {
+        const response = await fetch(`/api/game-scores/${GAME_ID}`);
+        return await response.json();
+      } catch (error) {
+        console.error('加载分数失败:', error);
+        return { dailyBest: { score: 0 }, weeklyBest: { score: 0 }, allTimeBest: { score: 0 } };
+      }
+    }
+
+    async function submitScore(finalScore) {
+      try {
+        const response = await fetch(`/api/game-scores/${GAME_ID}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ score: finalScore })
+        });
+        return await response.json();
+      } catch (error) {
+        console.error('提交分数失败:', error);
+        return { isNewRecord: false };
+      }
+    }
+
+    function jump() {
+      if (!gameState.isRunning || gameState.isJumping) return;
+      gameState.isJumping = true;
+      gameState.velocityY = gameState.jumpForce;
+    }
+
+    function createObstacle() {
+      const type = gameState.obstacleTypes[Math.floor(Math.random() * gameState.obstacleTypes.length)];
+      const obstacle = document.createElement('div');
+      obstacle.className = 'obstacle';
+      obstacle.textContent = type;
+      obstacle.style.right = '-50px';
+      document.querySelector('.game-area').appendChild(obstacle);
+      
+      gameState.obstacles.push({
+        element: obstacle,
+        x: window.innerWidth + 50,
+        passed: false
+      });
+    }
+
+    function checkCollision(obstacle) {
+      const playerRect = player.getBoundingClientRect();
+      const obstacleRect = obstacle.element.getBoundingClientRect();
+      
+      return !(playerRect.right < obstacleRect.left + 20 || 
+               playerRect.left > obstacleRect.right - 20 || 
+               playerRect.bottom < obstacleRect.top + 20 || 
+               playerRect.top > obstacleRect.bottom - 20);
+    }
+
+    function updateGame(timestamp) {
+      if (!gameState.isRunning) return;
+
+      // Update distance and score
+      gameState.distance += gameState.speed / 60;
+      gameState.score = Math.floor(gameState.distance);
+      document.getElementById('score').textContent = gameState.score;
+      document.getElementById('distance').textContent = Math.floor(gameState.distance) + 'm';
+
+      // Increase speed over time
+      gameState.speed = 5 + gameState.distance / 100;
+
+      // Update player position (jumping physics)
+      if (gameState.isJumping) {
+        gameState.velocityY += gameState.gravity;
+        gameState.playerY -= gameState.velocityY;
+        
+        if (gameState.playerY <= 60) {
+          gameState.playerY = 60;
+          gameState.isJumping = false;
+          gameState.velocityY = 0;
+        }
+        
+        player.style.bottom = gameState.playerY + 'px';
+      }
+
+      // Spawn obstacles
+      if (timestamp - gameState.lastSpawnTime > gameState.spawnInterval / (gameState.speed / 5)) {
+        createObstacle();
+        gameState.lastSpawnTime = timestamp;
+      }
+
+      // Update obstacles
+      gameState.obstacles = gameState.obstacles.filter(obstacle => {
+        obstacle.x -= gameState.speed;
+        obstacle.element.style.right = (window.innerWidth - obstacle.x) + 'px';
+        
+        // Check collision
+        if (checkCollision(obstacle)) {
+          endGame();
+          return false;
+        }
+        
+        // Remove off-screen obstacles
+        if (obstacle.x < -100) {
+          obstacle.element.remove();
+          return false;
+        }
+        
+        return true;
+      });
+
+      animationId = requestAnimationFrame(updateGame);
+    }
+
+    function startGame() {
+      gameState = {
+        isRunning: true,
+        score: 0,
+        distance: 0,
+        isJumping: false,
+        obstacles: [],
+        obstacleTypes: ['🏢', '🚗', '📦', '🗑️', '🚧'],
+        spawnInterval: 2000,
+        lastSpawnTime: 0,
+        speed: 5,
+        playerY: 60,
+        velocityY: 0,
+        gravity: 0.8,
+        jumpForce: -15
+      };
+
+      document.getElementById('score').textContent = '0';
+      document.getElementById('distance').textContent = '0m';
+      document.getElementById('startScreen').classList.add('hidden');
+      document.getElementById('gameOverScreen').classList.add('hidden');
+
+      // Clear obstacles
+      document.querySelectorAll('.obstacle').forEach(el => el.remove());
+
+      player.style.bottom = '60px';
+      animationId = requestAnimationFrame(updateGame);
+    }
+
+    async function endGame() {
+      gameState.isRunning = false;
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+
+      document.getElementById('finalScore').textContent = gameState.score;
+      
+      const result = await submitScore(gameState.score);
+      
+      document.getElementById('dailyBest').textContent = result.dailyBest || 0;
+      document.getElementById('weeklyBest').textContent = result.weeklyBest || 0;
+      document.getElementById('allTimeBest').textContent = result.allTimeBest || 0;
+
+      document.getElementById('gameOverScreen').classList.remove('hidden');
+    }
+
+    function restartGame() {
+      document.getElementById('gameOverScreen').classList.add('hidden');
+      startGame();
+    }
+
+    // Event listeners
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        jump();
+      }
+    });
+
+    document.addEventListener('click', () => {
+      if (gameState.isRunning) {
+        jump();
+      }
+    });
+
+    document.addEventListener('touchstart', () => {
+      if (gameState.isRunning) {
+        jump();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2048 - HomeStroy 游戏大厅</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .game-header {
+      text-align: center;
+      color: white;
+      margin-bottom: 20px;
+    }
+
+    .game-header h1 {
+      font-size: 48px;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .score-board {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .score-item {
+      background: rgba(255,255,255,0.2);
+      padding: 10px 20px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .score-label {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    .score-value {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .controls {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .controls select, .controls button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .controls select {
+      background: white;
+      color: #333;
+    }
+
+    .controls button {
+      background: #ffa726;
+      color: white;
+      transition: transform 0.2s;
+    }
+
+    .controls button:hover {
+      transform: scale(1.05);
+    }
+
+    .game-container {
+      background: #bbada0;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .cell-0 { background: rgba(238, 228, 218, 0.35); }
+    .cell-2 { background: #eee4da; color: #776e65; }
+    .cell-4 { background: #ede0c8; color: #776e65; }
+    .cell-8 { background: #f2b179; color: white; }
+    .cell-16 { background: #f59563; color: white; }
+    .cell-32 { background: #f67c5f; color: white; }
+    .cell-64 { background: #f65e3b; color: white; }
+    .cell-128 { background: #edcf72; color: white; }
+    .cell-256 { background: #edcc61; color: white; }
+    .cell-512 { background: #edc850; color: white; }
+    .cell-1024 { background: #edc53f; color: white; }
+    .cell-2048 { background: #edc22e; color: white; }
+    .cell-4096 { background: #3c3a32; color: white; }
+    .cell-8192 { background: #3c3a32; color: white; }
+    .cell-16384 { background: #3c3a32; color: white; }
+    .cell-32768 { background: #3c3a32; color: white; }
+
+    .cell.new {
+      animation: pop 0.2s ease;
+    }
+
+    .cell.merged {
+      animation: merge 0.2s ease;
+    }
+
+    @keyframes pop {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes merge {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    .game-over-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .game-over-overlay.show {
+      display: flex;
+    }
+
+    .game-over-content {
+      background: white;
+      padding: 40px;
+      border-radius: 15px;
+      text-align: center;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(-50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .game-over-content h2 {
+      font-size: 36px;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .game-over-content p {
+      font-size: 20px;
+      margin-bottom: 10px;
+      color: #666;
+    }
+
+    .game-over-content .final-score {
+      font-size: 48px;
+      color: #f59563;
+      margin: 20px 0;
+    }
+
+    .game-over-content button {
+      margin-top: 20px;
+      padding: 15px 40px;
+      font-size: 18px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .game-over-content button:hover {
+      transform: scale(1.05);
+    }
+
+    .instructions {
+      color: white;
+      text-align: center;
+      margin-top: 20px;
+      opacity: 0.8;
+    }
+
+    .win-message {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #edc22e;
+      color: white;
+      padding: 30px 60px;
+      border-radius: 15px;
+      font-size: 32px;
+      font-weight: bold;
+      z-index: 50;
+      animation: winPop 0.5s ease;
+    }
+
+    .win-message.show {
+      display: block;
+    }
+
+    @keyframes winPop {
+      0% { transform: translate(-50%, -50%) scale(0); }
+      50% { transform: translate(-50%, -50%) scale(1.2); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-header">
+    <h1>2048</h1>
+    <div class="score-board">
+      <div class="score-item">
+        <div class="score-label">当前分数</div>
+        <div class="score-value" id="currentScore">0</div>
+      </div>
+      <div class="score-item">
+        <div class="score-label">今日最高</div>
+        <div class="score-value" id="dailyBest">0</div>
+      </div>
+      <div class="score-item">
+        <div class="score-label">本周最高</div>
+        <div class="score-value" id="weeklyBest">0</div>
+      </div>
+      <div class="score-item">
+        <div class="score-label">历史最高</div>
+        <div class="score-value" id="allTimeBest">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <select id="gridSize">
+      <option value="4">4×4</option>
+      <option value="5">5×5</option>
+      <option value="6">6×6</option>
+      <option value="7">7×7</option>
+      <option value="8">8×8</option>
+    </select>
+    <button onclick="newGame()">新游戏</button>
+  </div>
+
+  <div class="game-container">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="instructions">
+    <p>使用方向键或 WASD 移动方块</p>
+    <p>相同数字合并，达到 2048 即可获胜，但可以继续挑战更高分数！</p>
+  </div>
+
+  <div class="win-message" id="winMessage">
+    🎉 恭喜达成 2048！🎉
+  </div>
+
+  <div class="game-over-overlay" id="gameOverOverlay">
+    <div class="game-over-content">
+      <h2>游戏结束</h2>
+      <p>最终分数</p>
+      <div class="final-score" id="finalScore">0</div>
+      <p id="recordMessage"></p>
+      <button onclick="newGame(); hideGameOver();">再来一局</button>
+    </div>
+  </div>
+
+  <script>
+    const GAME_ID = '2048';
+    let gridSize = 4;
+    let grid = [];
+    let score = 0;
+    let hasWon = false;
+    let gameOver = false;
+
+    // 加载最高分
+    async function loadHighScores() {
+      try {
+        const response = await fetch(`/api/game-scores/${GAME_ID}`);
+        const data = await response.json();
+        document.getElementById('dailyBest').textContent = data.dailyBest.score;
+        document.getElementById('weeklyBest').textContent = data.weeklyBest.score;
+        document.getElementById('allTimeBest').textContent = data.allTimeBest.score;
+      } catch (error) {
+        console.error('加载分数失败:', error);
+      }
+    }
+
+    // 提交分数
+    async function submitScore(finalScore) {
+      try {
+        const response = await fetch(`/api/game-scores/${GAME_ID}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ score: finalScore })
+        });
+        const data = await response.json();
+        
+        document.getElementById('dailyBest').textContent = data.dailyBest;
+        document.getElementById('weeklyBest').textContent = data.weeklyBest;
+        document.getElementById('allTimeBest').textContent = data.allTimeBest;
+        
+        return data.isNewRecord;
+      } catch (error) {
+        console.error('提交分数失败:', error);
+        return false;
+      }
+    }
+
+    function initGrid() {
+      grid = [];
+      for (let i = 0; i < gridSize; i++) {
+        grid.push(new Array(gridSize).fill(0));
+      }
+    }
+
+    function getCellSize() {
+      const sizes = { 4: 100, 5: 80, 6: 66, 7: 56, 8: 50 };
+      return sizes[gridSize] || 80;
+    }
+
+    function getFontSize(value) {
+      const cellSize = getCellSize();
+      if (value >= 1000) return cellSize * 0.3;
+      if (value >= 100) return cellSize * 0.4;
+      return cellSize * 0.5;
+    }
+
+    function renderGrid() {
+      const gridElement = document.getElementById('grid');
+      const cellSize = getCellSize();
+      
+      gridElement.style.gridTemplateColumns = `repeat(${gridSize}, ${cellSize}px)`;
+      gridElement.innerHTML = '';
+
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          const cell = document.createElement('div');
+          const value = grid[i][j];
+          cell.className = `cell cell-${value}`;
+          cell.style.width = `${cellSize}px`;
+          cell.style.height = `${cellSize}px`;
+          cell.style.fontSize = `${getFontSize(value)}px`;
+          cell.textContent = value || '';
+          cell.dataset.row = i;
+          cell.dataset.col = j;
+          gridElement.appendChild(cell);
+        }
+      }
+    }
+
+    function addRandomTile() {
+      const emptyCells = [];
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          if (grid[i][j] === 0) {
+            emptyCells.push({ row: i, col: j });
+          }
+        }
+      }
+
+      if (emptyCells.length > 0) {
+        const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        grid[randomCell.row][randomCell.col] = Math.random() < 0.9 ? 2 : 4;
+        
+        setTimeout(() => {
+          const cells = document.querySelectorAll('.cell');
+          const index = randomCell.row * gridSize + randomCell.col;
+          if (cells[index]) {
+            cells[index].classList.add('new');
+          }
+        }, 50);
+      }
+    }
+
+    function slide(row) {
+      let arr = row.filter(val => val !== 0);
+      let missing = gridSize - arr.length;
+      let zeros = new Array(missing).fill(0);
+      return zeros.concat(arr);
+    }
+
+    function combine(row) {
+      for (let i = gridSize - 1; i > 0; i--) {
+        if (row[i] === row[i - 1] && row[i] !== 0) {
+          row[i] *= 2;
+          score += row[i];
+          row[i - 1] = 0;
+          
+          if (row[i] === 2048 && !hasWon) {
+            hasWon = true;
+            showWinMessage();
+          }
+        }
+      }
+      return row;
+    }
+
+    function moveRight() {
+      let moved = false;
+      for (let i = 0; i < gridSize; i++) {
+        let row = grid[i].slice();
+        row = slide(row);
+        row = combine(row);
+        row = slide(row);
+        if (row.join(',') !== grid[i].join(',')) {
+          moved = true;
+        }
+        grid[i] = row;
+      }
+      return moved;
+    }
+
+    function moveLeft() {
+      let moved = false;
+      for (let i = 0; i < gridSize; i++) {
+        let row = grid[i].slice().reverse();
+        row = slide(row);
+        row = combine(row);
+        row = slide(row);
+        row = row.reverse();
+        if (row.join(',') !== grid[i].join(',')) {
+          moved = true;
+        }
+        grid[i] = row;
+      }
+      return moved;
+    }
+
+    function moveUp() {
+      let moved = false;
+      for (let j = 0; j < gridSize; j++) {
+        let col = [];
+        for (let i = 0; i < gridSize; i++) {
+          col.push(grid[i][j]);
+        }
+        col = col.reverse();
+        col = slide(col);
+        col = combine(col);
+        col = slide(col);
+        col = col.reverse();
+        
+        for (let i = 0; i < gridSize; i++) {
+          if (grid[i][j] !== col[i]) {
+            moved = true;
+          }
+          grid[i][j] = col[i];
+        }
+      }
+      return moved;
+    }
+
+    function moveDown() {
+      let moved = false;
+      for (let j = 0; j < gridSize; j++) {
+        let col = [];
+        for (let i = 0; i < gridSize; i++) {
+          col.push(grid[i][j]);
+        }
+        col = slide(col);
+        col = combine(col);
+        col = slide(col);
+        
+        for (let i = 0; i < gridSize; i++) {
+          if (grid[i][j] !== col[i]) {
+            moved = true;
+          }
+          grid[i][j] = col[i];
+        }
+      }
+      return moved;
+    }
+
+    function checkGameOver() {
+      // Check for empty cells
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          if (grid[i][j] === 0) return false;
+        }
+      }
+
+      // Check for possible merges
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          if (j < gridSize - 1 && grid[i][j] === grid[i][j + 1]) return false;
+          if (i < gridSize - 1 && grid[i][j] === grid[i + 1][j]) return false;
+        }
+      }
+
+      return true;
+    }
+
+    function showWinMessage() {
+      const winMessage = document.getElementById('winMessage');
+      winMessage.classList.add('show');
+      setTimeout(() => {
+        winMessage.classList.remove('show');
+      }, 3000);
+    }
+
+    async function showGameOver() {
+      gameOver = true;
+      document.getElementById('finalScore').textContent = score;
+      
+      const isNewRecord = await submitScore(score);
+      const recordMessage = document.getElementById('recordMessage');
+      recordMessage.textContent = isNewRecord ? '🎉 新纪录！' : '';
+      
+      document.getElementById('gameOverOverlay').classList.add('show');
+    }
+
+    function hideGameOver() {
+      document.getElementById('gameOverOverlay').classList.remove('show');
+    }
+
+    function updateScore() {
+      document.getElementById('currentScore').textContent = score;
+    }
+
+    function newGame() {
+      score = 0;
+      hasWon = false;
+      gameOver = false;
+      gridSize = parseInt(document.getElementById('gridSize').value);
+      initGrid();
+      addRandomTile();
+      addRandomTile();
+      renderGrid();
+      updateScore();
+      loadHighScores();
+    }
+
+    function handleMove(direction) {
+      if (gameOver) return;
+
+      let moved = false;
+      switch (direction) {
+        case 'up':
+          moved = moveUp();
+          break;
+        case 'down':
+          moved = moveDown();
+          break;
+        case 'left':
+          moved = moveLeft();
+          break;
+        case 'right':
+          moved = moveRight();
+          break;
+      }
+
+      if (moved) {
+        addRandomTile();
+        renderGrid();
+        updateScore();
+
+        if (checkGameOver()) {
+          showGameOver();
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          e.preventDefault();
+          handleMove('up');
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          e.preventDefault();
+          handleMove('down');
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          e.preventDefault();
+          handleMove('left');
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          e.preventDefault();
+          handleMove('right');
+          break;
+      }
+    });
+
+    // Touch support
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    });
+
+    document.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      
+      const diffX = touchEndX - touchStartX;
+      const diffY = touchEndY - touchStartY;
+      
+      const threshold = 50;
+      
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        if (Math.abs(diffX) > threshold) {
+          handleMove(diffX > 0 ? 'right' : 'left');
+        }
+      } else {
+        if (Math.abs(diffY) > threshold) {
+          handleMove(diffY > 0 ? 'down' : 'up');
+        }
+      }
+    });
+
+    // Initialize game
+    newGame();
+  </script>
+</body>
+</html>
