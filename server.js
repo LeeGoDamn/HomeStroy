@@ -609,6 +609,15 @@ app.post('/api/knowledge/import', (req, res) => {
 
 // ========== 游戏分数 API ==========
 
+// 获取本周一的日期字符串
+function getWeekStart(date) {
+  const dayOfWeek = date.getDay();
+  const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - mondayOffset);
+  return monday.toISOString().split('T')[0];
+}
+
 // 获取游戏分数
 app.get('/api/game-scores/:gameId', (req, res) => {
   const gameId = req.params.gameId;
@@ -629,13 +638,7 @@ app.get('/api/game-scores/:gameId', (req, res) => {
   // 检查是否需要重置每日/每周最高分
   const now = new Date();
   const today = now.toISOString().split('T')[0];
-  
-  // 获取本周一的日期
-  const dayOfWeek = now.getDay();
-  const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - mondayOffset);
-  const weekStart = monday.toISOString().split('T')[0];
+  const weekStart = getWeekStart(now);
   
   // 重置每日最高分（如果是新的一天）
   if (gameScores.dailyBest.date !== today) {
@@ -668,13 +671,7 @@ app.post('/api/game-scores/:gameId', (req, res) => {
   
   const now = new Date();
   const today = now.toISOString().split('T')[0];
-  
-  // 获取本周一的日期
-  const dayOfWeek = now.getDay();
-  const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - mondayOffset);
-  const weekStart = monday.toISOString().split('T')[0];
+  const weekStart = getWeekStart(now);
   
   if (!scores[gameId]) {
     scores[gameId] = {
